@@ -1,0 +1,38 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "5s"
+      httpMethod: "GET"
+
+  - name: MongoDB
+    type: mongodb
+    access: proxy
+    url: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongo:27017/admin"
+    database: ${MONGO_DATABASE:-charging_simulator}
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: "1m"
+      tlsAuth: false
+      tlsAuthWithCACert: false
+      tlsSkipVerify: true
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    isDefault: false
+    editable: true
+    jsonData:
+      poolSize: 5
+      timeout: 10
+      pingInterval: 60
+      pipelineWindow: 0
+      tlsAuth: false
