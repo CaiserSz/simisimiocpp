@@ -13,7 +13,7 @@ describe('WebSocketServer', () => {
 
   beforeAll((done) => {
     httpServer = createServer();
-    serverPort = 3001;
+    serverPort = 9220;
     
     httpServer.listen(serverPort, () => {
       webSocketServer = new WebSocketServer();
