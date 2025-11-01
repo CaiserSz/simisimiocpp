@@ -1,0 +1,22 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "env": {
+    "apiUrl": "http://localhost:3001/api"
+  },
+  "defaultCommandTimeout": 10000,
+  "pageLoadTimeout": 60000,
+  "requestTimeout": 10000,
+  "responseTimeout": 40000,
+  "video": false,
+  "screenshotOnRunFailure": true,
+  "retries": {
+    "runMode": 1,
+    "openMode": 0
+  },
+  "viewportWidth": 1280,
+  "viewportHeight": 800,
+  "testFiles": "**/*.cy.js",
+  "experimentalStudio": true,
+  "experimentalSessionSupport": true,
+  "chromeWebSecurity": false
+}

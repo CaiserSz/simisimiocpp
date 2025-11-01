@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "name": "Test Station 1",
+    "model": "Test Model 1",
+    "connector": "CCS",
+    "power": 50,
+    "status": "Available"
+  },
+  {
+    "id": "2",
+    "name": "Test Station 2",
+    "model": "Test Model 2",
+    "connector": "Type 2",
+    "power": 22,
+    "status": "Charging"
+  }
+]

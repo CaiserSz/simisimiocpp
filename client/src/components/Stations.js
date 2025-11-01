@@ -1,347 +1,526 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { stationAPI } from '../api';
+import { useFormik } from 'formik';
+import * as Yup from 'yup';
 import { 
+  Box, 
+  Typography, 
+  Paper, 
   Table, 
   TableBody, 
   TableCell, 
   TableContainer, 
   TableHead, 
-  TableRow, 
-  Paper, 
-  Button, 
-  IconButton,
+  TableRow,
   Chip,
-  Grid,
-  TextField,
+  Button,
+  IconButton,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  CircularProgress,
+  Alert,
+  Snackbar,
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
-  Typography,
-  Box
-} from '@material-ui/core';
-import { 
-  Add as AddIcon, 
-  PowerSettingsNew as PowerIcon, 
-  Edit as EditIcon,
+  MenuItem
+} from '@mui/material';
+import {
+  PlayArrow as StartIcon,
+  Stop as StopIcon,
   Delete as DeleteIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
   Refresh as RefreshIcon
-} from '@material-ui/icons';
-import { makeStyles } from '@material-ui/core/styles';
+} from '@mui/icons-material';
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    padding: theme.spacing(3),
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing(3),
-  },
-  table: {
-    minWidth: 650,
-  },
-  statusChip: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  actionButton: {
-    marginRight: theme.spacing(1),
-  },
-  formControl: {
-    minWidth: 200,
-    marginRight: theme.spacing(2),
-  },
-  dialogContent: {
-    paddingTop: theme.spacing(2),
-  },
-}));
-
-const statusMap = {
-  available: { label: 'Müsait', color: '#4caf50' },
-  charging: { label: 'Şarj Ediyor', color: '#ff9800' },
-  faulted: { label: 'Arızalı', color: '#f44336' },
-  unavailable: { label: 'Kullanım Dışı', color: '#9e9e9e' },
-};
-
-const connectorTypes = [
-  'Type 1',
-  'Type 2',
-  'CCS',
-  'CHAdeMO',
-  'Tesla',
-];
-
-const initialFormState = {
-  id: '',
-  name: '',
-  model: '',
-  connectorType: 'Type 2',
-  maxPower: 22,
-  status: 'available',
-};
+// Ayrı bir bileşen olarak StationRow
+const StationRow = React.memo(({ station, onEdit, onDelete, onStart, onStop }) => {
+  return (
+    <TableRow>
+      <TableCell>{station.name}</TableCell>
+      <TableCell>{station.model}</TableCell>
+      <TableCell>
+        <Chip 
+          label={station.status} 
+          color={
+            station.status === 'Available' ? 'success' : 
+            station.status === 'Charging' ? 'error' : 'default'
+          } 
+        />
+      </TableCell>
+      <TableCell>
+        <Chip 
+          label={station.connector} 
+          variant="outlined" 
+          size="small" 
+        />
+      </TableCell>
+      <TableCell>{station.power} kW</TableCell>
+      <TableCell>
+        <Box display="flex" gap={1}>
+          <Tooltip title="Düzenle">
+            <IconButton size="small" onClick={() => onEdit(station)}>
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Sil">
+            <IconButton size="small" onClick={() => onDelete(station.id)} color="error">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {station.status === 'Available' ? (
+            <Tooltip title="Şarjı Başlat">
+              <IconButton 
+                size="small" 
+                color="primary"
+                onClick={() => onStart(station.id)}
+              >
+                <StartIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title="Şarjı Durdur">
+              <IconButton 
+                size="small" 
+                color="secondary"
+                onClick={() => onStop(station.id)}
+              >
+                <StopIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+});
 
 const Stations = () => {
-  const classes = useStyles();
+  // navigate değişkeni kaldırıldı çünkü kullanılmıyor
   const [stations, setStations] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState(initialFormState);
-  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Örnek veriler
-  useEffect(() => {
-    // Gerçek uygulamada burada API'den veri çekilecek
-    const mockStations = [
-      { id: 'CS001', name: 'Ana İstasyon', model: 'ABB Terra 54', connectorType: 'CCS', maxPower: 50, status: 'available', lastSeen: '2 dakika önce' },
-      { id: 'CS002', name: 'Yan İstasyon', model: 'ABB Terra 24', connectorType: 'Type 2', maxPower: 22, status: 'charging', lastSeen: '1 dakika önce' },
-      { id: 'CS003', name: 'Arka Bahçe', model: 'Siemens VersiCharge', connectorType: 'Type 2', maxPower: 11, status: 'unavailable', lastSeen: '1 saat önce' },
-    ];
-    setStations(mockStations);
+  // Form doğrulama şeması
+  const validationSchema = Yup.object({
+    name: Yup.string()
+      .required('İstasyon adı zorunludur')
+      .min(3, 'En az 3 karakter olmalıdır')
+      .max(50, 'En fazla 50 karakter olabilir'),
+    model: Yup.string()
+      .required('Model adı zorunludur'),
+    connector: Yup.string()
+      .required('Konnektör tipi seçmelisiniz'),
+    power: Yup.number()
+      .required('Güç değeri zorunludur')
+      .positive('Pozitif bir değer olmalıdır')
+      .integer('Tam sayı olmalıdır')
+  });
+
+  // Verileri yükle
+  const loadStations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await stationAPI.getAll();
+      setStations(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('İstasyonlar yüklenirken hata:', err);
+      setError('İstasyonlar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      // Hata durumunda mock verileri göster
+      setStations(mockStations);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleOpenAddDialog = () => {
-    setFormData(initialFormState);
-    setIsEditing(false);
-    setOpen(true);
-  };
+  // Formik yapılandırması
+  const formik = useFormik({
+    initialValues: {
+      name: '',
+      model: '',
+      connector: 'CCS',
+      power: ''
+    },
+    validationSchema,
+    onSubmit: async (values, { resetForm }) => {
+      try {
+        setIsSubmitting(true);
+        if (selectedStation) {
+          await stationAPI.updateStation(selectedStation.id, values);
+          setSnackbar({ open: true, message: 'İstasyon başarıyla güncellendi', severity: 'success' });
+        } else {
+          await stationAPI.addStation(values);
+          setSnackbar({ open: true, message: 'İstasyon başarıyla eklendi', severity: 'success' });
+        }
+        await loadStations();
+        setOpenDialog(false);
+        resetForm();
+      } catch (error) {
+        console.error('İstasyon kaydedilirken hata oluştu:', error);
+        setSnackbar({ 
+          open: true, 
+          message: error.response?.data?.message || 'Bir hata oluştu', 
+          severity: 'error' 
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  });
 
-  const handleOpenEditDialog = (station) => {
-    setFormData(station);
-    setIsEditing(true);
-    setOpen(true);
-  };
+  useEffect(() => {
+    loadStations();
+  }, [loadStations]);
 
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (isEditing) {
-      // Güncelleme işlemi
-      setStations(stations.map(station => 
-        station.id === formData.id ? formData : station
-      ));
+  // İstasyon düzenleme için formu doldur
+  useEffect(() => {
+    if (selectedStation) {
+      formik.setValues({
+        name: selectedStation.name || '',
+        model: selectedStation.model || '',
+        connector: selectedStation.connector || 'CCS',
+        power: selectedStation.power || 22
+      });
     } else {
-      // Yeni ekleme işlemi
-      const newStation = {
-        ...formData,
-        id: `CS${String(stations.length + 1).padStart(3, '0')}`,
-        lastSeen: 'Şimdi',
-      };
-      setStations([...stations, newStation]);
+      formik.resetForm();
     }
-    
-    setOpen(false);
+  }, [selectedStation, formik]);
+
+  // İstasyon düzenle
+  const handleEdit = (station) => {
+    setSelectedStation(station);
+    setOpenDialog(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Bu istasyonu silmek istediğinizden emin misiniz?')) {
-      setStations(stations.filter(station => station.id !== id));
+  // Yeni istasyon ekle
+  const handleAddNew = () => {
+    setSelectedStation(null);
+    setOpenDialog(true);
+  };
+
+  // İstasyon sil
+  const handleDelete = async (id) => {
+    if (window.confirm('Bu istasyonu silmek istediğinize emin misiniz?')) {
+      try {
+        await stationAPI.delete(id);
+        setStations(stations.filter(station => station.id !== id));
+        showSnackbar('İstasyon başarıyla silindi.', 'success');
+      } catch (err) {
+        console.error('İstasyon silinirken hata:', err);
+        showSnackbar(
+          err.response?.data?.message || 'İstasyon silinirken bir hata oluştu.', 
+          'error'
+        );
+      }
     }
   };
 
-  const handleStatusChange = (id, newStatus) => {
+  // Şarj başlat
+  const handleStartCharging = async (id) => {
+    try {
+      await stationAPI.startCharging(id);
+      updateStationStatus(id, 'Charging');
+      showSnackbar('Şarj başlatıldı.', 'success');
+    } catch (err) {
+      console.error('Şarj başlatılırken hata:', err);
+      showSnackbar(
+        err.response?.data?.message || 'Şarj başlatılırken bir hata oluştu.', 
+        'error'
+      );
+    }
+  };
+
+  // Şarj durdur
+  const handleStopCharging = async (id) => {
+    try {
+      await stationAPI.stopCharging(id);
+      updateStationStatus(id, 'Available');
+      showSnackbar('Şarj durduruldu.', 'success');
+    } catch (err) {
+      console.error('Şarj durdurulurken hata:', err);
+      showSnackbar(
+        err.response?.data?.message || 'Şarj durdurulurken bir hata oluştu.', 
+        'error'
+      );
+    }
+  };
+
+  // İstasyon durumunu güncelle
+  const updateStationStatus = (id, status) => {
     setStations(stations.map(station => 
-      station.id === id ? { ...station, status: newStatus } : station
+      station.id === id ? { ...station, status } : station
     ));
   };
 
-  return (
-    <div className={classes.root}>
-      <div className={classes.header}>
-        <Typography variant="h4">Şarj İstasyonları</Typography>
-        <div>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            startIcon={<AddIcon />}
-            onClick={handleOpenAddDialog}
-          >
-            Yeni İstasyon Ekle
-          </Button>
-        </div>
-      </div>
+  // Snackbar göster
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
-      <TableContainer component={Paper}>
-        <Table className={classes.table}>
+  // Snackbar kapat
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Toplam istasyon sayısı
+  const totalStations = useMemo(() => stations.length, [stations]);
+
+  // Aktif şarj sayısı
+  const activeCharging = useMemo(
+    () => stations.filter(s => s.status === 'Charging').length,
+    [stations]
+  );
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ my: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h5" component="h1" gutterBottom>
+            Şarj İstasyonları
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Toplam {totalStations} istasyon • {activeCharging} aktif şarj
+          </Typography>
+        </Box>
+        <Box>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleAddNew}
+            sx={{ mr: 1 }}
+          >
+            Yeni İstasyon
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadStations}
+          >
+            Yenile
+          </Button>
+        </Box>
+      </Box>
+
+      <TableContainer component={Paper} elevation={3}>
+        <Table>
           <TableHead>
             <TableRow>
-              <TableCell>ID</TableCell>
               <TableCell>İsim</TableCell>
               <TableCell>Model</TableCell>
-              <TableCell>Konnektör Tipi</TableCell>
-              <TableCell>Maks. Güç (kW)</TableCell>
               <TableCell>Durum</TableCell>
-              <TableCell>Son Görülme</TableCell>
+              <TableCell>Konnektör</TableCell>
+              <TableCell>Güç</TableCell>
               <TableCell align="right">İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {stations.map((station) => (
-              <TableRow key={station.id}>
-                <TableCell>{station.id}</TableCell>
-                <TableCell>{station.name}</TableCell>
-                <TableCell>{station.model}</TableCell>
-                <TableCell>{station.connectorType}</TableCell>
-                <TableCell>{station.maxPower} kW</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={statusMap[station.status]?.label || station.status}
-                    style={{ 
-                      backgroundColor: statusMap[station.status]?.color || '#9e9e9e',
-                      color: 'white',
-                      fontWeight: 'bold',
-                    }}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>{station.lastSeen}</TableCell>
-                <TableCell align="right">
-                  <IconButton 
-                    size="small" 
-                    className={classes.actionButton}
-                    onClick={() => handleStatusChange(station.id, 
-                      station.status === 'available' ? 'unavailable' : 'available'
-                    )}
-                  >
-                    <PowerIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    className={classes.actionButton}
-                    onClick={() => handleOpenEditDialog(station)}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    color="secondary"
-                    onClick={() => handleDelete(station.id)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
+            {stations.map(station => (
+              <StationRow
+                key={station.id}
+                station={station}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onStart={handleStartCharging}
+                onStop={handleStopCharging}
+              />
             ))}
           </TableBody>
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <form onSubmit={handleSubmit}>
+      {/* İstasyon Düzenleme Diyaloğu */}
+      <Dialog 
+        open={openDialog} 
+        onClose={() => {
+          setOpenDialog(false);
+          formik.resetForm();
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <form onSubmit={formik.handleSubmit}>
           <DialogTitle>
-            {isEditing ? 'İstasyonu Düzenle' : 'Yeni İstasyon Ekle'}
+            {selectedStation ? 'İstasyonu Düzenle' : 'Yeni İstasyon Ekle'}
           </DialogTitle>
-          <DialogContent className={classes.dialogContent}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  name="name"
-                  label="İstasyon Adı"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="model"
-                  label="Model"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.model}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl variant="outlined" fullWidth>
-                  <InputLabel>Konnektör Tipi</InputLabel>
-                  <Select
-                    name="connectorType"
-                    value={formData.connectorType}
-                    onChange={handleInputChange}
-                    label="Konnektör Tipi"
-                    required
-                  >
-                    {connectorTypes.map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {type}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="maxPower"
-                  label="Maksimum Güç (kW)"
-                  type="number"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.maxPower}
-                  onChange={handleInputChange}
-                  inputProps={{ min: 3.7, max: 350, step: 0.1 }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl variant="outlined" fullWidth>
-                  <InputLabel>Durum</InputLabel>
-                  <Select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    label="Durum"
-                    required
-                  >
-                    {Object.entries(statusMap).map(([key, { label }]) => (
-                      <MenuItem key={key} value={key}>
-                        <Box display="flex" alignItems="center">
-                          <Box 
-                            width={12} 
-                            height={12} 
-                            bgcolor={statusMap[key]?.color} 
-                            borderRadius="50%"
-                            mr={1}
-                          />
-                          {label}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              name="name"
+              label="İstasyon Adı"
+              fullWidth
+              variant="outlined"
+              value={formik.values.name}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.name && Boolean(formik.errors.name)}
+              helperText={formik.touched.name && formik.errors.name}
+              disabled={isSubmitting}
+              sx={{ mt: 2 }}
+            />
+            
+            <TextField
+              margin="dense"
+              name="model"
+              label="Model"
+              fullWidth
+              variant="outlined"
+              value={formik.values.model}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.model && Boolean(formik.errors.model)}
+              helperText={formik.touched.model && formik.errors.model}
+              disabled={isSubmitting}
+            />
+            
+            <FormControl 
+              fullWidth 
+              margin="dense"
+              error={formik.touched.connector && Boolean(formik.errors.connector)}
+            >
+              <InputLabel>Konnektör Tipi</InputLabel>
+              <Select
+                name="connector"
+                label="Konnektör Tipi"
+                value={formik.values.connector}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                disabled={isSubmitting}
+              >
+                <MenuItem value="CCS">CCS</MenuItem>
+                <MenuItem value="Type 2">Type 2</MenuItem>
+                <MenuItem value="CHAdeMO">CHAdeMO</MenuItem>
+              </Select>
+              {formik.touched.connector && formik.errors.connector && (
+                <Typography color="error" variant="caption">
+                  {formik.errors.connector}
+                </Typography>
+              )}
+            </FormControl>
+            
+            <TextField
+              margin="dense"
+              name="power"
+              label="Güç (kW)"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={formik.values.power}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.power && Boolean(formik.errors.power)}
+              helperText={formik.touched.power && formik.errors.power}
+              disabled={isSubmitting}
+              inputProps={{
+                min: 1,
+                max: 350,
+                step: 0.1
+              }}
+            />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleClose} color="primary">
+          <DialogActions sx={{ p: 3, pt: 0 }}>
+            <Button 
+              onClick={() => {
+                setOpenDialog(false);
+                formik.resetForm();
+              }}
+              disabled={isSubmitting}
+            >
               İptal
             </Button>
-            <Button type="submit" color="primary" variant="contained">
-              {isEditing ? 'Güncelle' : 'Ekle'}
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              disabled={!formik.isValid || isSubmitting}
+              startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
+            >
+              {selectedStation ? 'Güncelle' : 'Ekle'}
             </Button>
           </DialogActions>
         </form>
       </Dialog>
-    </div>
+
+      {/* Bildirimler */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
+
+// Mock veriler (gerçek uygulamada API'den gelecek)
+const mockStations = [
+  { 
+    id: '1', 
+    name: 'Ana İstasyon', 
+    status: 'Available', 
+    model: 'ABB Terra 54', 
+    connector: 'CCS', 
+    power: 50, 
+    current: '125A', 
+    voltage: '400V',
+    lastSeen: '2 dakika önce' 
+  },
+  { 
+    id: '2', 
+    name: 'Yan İstasyon', 
+    status: 'Charging', 
+    model: 'Siemens VersiCharge', 
+    connector: 'Type 2', 
+    power: 22, 
+    current: '32A', 
+    voltage: '230V',
+    lastSeen: '1 dakika önce' 
+  },
+  { 
+    id: '3', 
+    name: 'Arka Bahçe', 
+    status: 'Faulted', 
+    model: 'Siemens VersiCharge', 
+    connector: 'Type 2', 
+    power: 11, 
+    current: '16A', 
+    voltage: '230V',
+    lastSeen: '1 saat önce' 
+  }
+];
 
 export default Stations;

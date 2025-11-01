@@ -1,0 +1,33 @@
+import { Router } from 'express';
+import authRoutes from './auth.routes.js';
+import userRoutes from './user.routes.js';
+import stationRoutes from './station.routes.js';
+import transactionRoutes from './transaction.routes.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+
+const router = Router();
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  });
+});
+
+// API routes
+router.use('/auth', authRoutes);
+router.use('/users', authenticate, authorize('admin'), userRoutes);
+router.use('/stations', authenticate, stationRoutes);
+router.use('/transactions', authenticate, transactionRoutes);
+
+// 404 handler for API routes
+router.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'API endpoint not found',
+  });
+});
+
+export default router;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Paper, 
   Typography, 
@@ -13,46 +13,44 @@ import {
   Switch,
   FormControlLabel,
   Box,
-  Snackbar,
-  Alert,
   Tabs,
-  Tab
-} from '@material-ui/core';
-import { makeStyles } from '@material-ui/core/styles';
-import { Save as SaveIcon, Restore as RestoreIcon } from '@material-ui/icons';
+  Tab,
+  styled
+} from '@mui/material';
+import MuiAlert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import { Save as SaveIcon, Restore as RestoreIcon } from '@mui/icons-material';
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    padding: theme.spacing(3),
-  },
-  paper: {
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(3),
-  },
-  sectionTitle: {
-    marginBottom: theme.spacing(2),
-    paddingBottom: theme.spacing(1),
-    borderBottom: `1px solid ${theme.palette.divider}`,
-  },
-  formControl: {
-    minWidth: 200,
+const Alert = React.forwardRef(function Alert(props, ref) {
+  return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
+});
+
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  marginBottom: theme.spacing(3),
+}));
+
+const SectionTitle = styled(Typography)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+  paddingBottom: theme.spacing(1),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  minWidth: 200,
+  marginRight: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
+
+const ActionButtons = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(3),
+  '& > *': {
     marginRight: theme.spacing(2),
-    marginBottom: theme.spacing(2),
-  },
-  actionButtons: {
-    marginTop: theme.spacing(3),
-    '& > *': {
-      marginRight: theme.spacing(2),
-    },
-  },
-  tabPanel: {
-    padding: theme.spacing(2, 0),
   },
 }));
 
-function TabPanel(props) {
+const TabPanel = (props) => {
   const { children, value, index, ...other } = props;
-  const classes = useStyles();
 
   return (
     <div
@@ -63,25 +61,26 @@ function TabPanel(props) {
       {...other}
     >
       {value === index && (
-        <Box className={classes.tabPanel}>
+        <Box sx={{ p: 2 }}>
           {children}
         </Box>
       )}
     </div>
   );
-}
+};
 
-function a11yProps(index) {
-  return {
-    id: `config-tab-${index}`,
-    'aria-controls': `config-tabpanel-${index}`,
-  };
-}
+const a11yProps = (index) => ({
+  id: `config-tab-${index}`,
+  'aria-controls': `config-tabpanel-${index}`,
+});
 
 const Configuration = () => {
-  const classes = useStyles();
   const [tabValue, setTabValue] = useState(0);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
+  });
   
   // Yapılandırma durumları
   const [generalConfig, setGeneralConfig] = useState({
@@ -206,12 +205,12 @@ const Configuration = () => {
   };
 
   return (
-    <div className={classes.root}>
+    <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Sistem Yapılandırması
       </Typography>
       
-      <Paper className={classes.paper}>
+      <StyledPaper>
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
@@ -228,9 +227,9 @@ const Configuration = () => {
         </Tabs>
         
         <TabPanel value={tabValue} index={0}>
-          <Typography variant="h6" className={classes.sectionTitle}>
+          <SectionTitle variant="h6">
             Genel Ayarlar
-          </Typography>
+          </SectionTitle>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <TextField
@@ -241,9 +240,10 @@ const Configuration = () => {
                 onChange={handleGeneralChange}
                 variant="outlined"
                 margin="normal"
+                sx={{ mb: 2 }}
               />
               
-              <FormControl variant="outlined" className={classes.formControl} fullWidth>
+              <StyledFormControl variant="outlined" fullWidth>
                 <InputLabel>Zaman Dilimi</InputLabel>
                 <Select
                   name="timezone"
@@ -257,9 +257,9 @@ const Configuration = () => {
                   <MenuItem value="America/New_York">New York (UTC-5)</MenuItem>
                   <MenuItem value="Asia/Tokyo">Tokyo (UTC+9)</MenuItem>
                 </Select>
-              </FormControl>
+              </StyledFormControl>
               
-              <FormControl variant="outlined" className={classes.formControl} fullWidth>
+              <StyledFormControl variant="outlined" fullWidth>
                 <InputLabel>Dil</InputLabel>
                 <Select
                   name="language"
@@ -272,7 +272,7 @@ const Configuration = () => {
                   <MenuItem value="de">Deutsch</MenuItem>
                   <MenuItem value="fr">Français</MenuItem>
                 </Select>
-              </FormControl>
+              </StyledFormControl>
             </Grid>
             
             <Grid item xs={12} md={6}>
@@ -306,12 +306,12 @@ const Configuration = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
-          <Typography variant="h6" className={classes.sectionTitle}>
+          <SectionTitle variant="h6">
             OCPP Ayarları
-          </Typography>
+          </SectionTitle>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <FormControl variant="outlined" className={classes.formControl} fullWidth>
+              <StyledFormControl variant="outlined" fullWidth>
                 <InputLabel>OCPP Sürümü</InputLabel>
                 <Select
                   name="ocppVersion"
@@ -323,7 +323,7 @@ const Configuration = () => {
                   <MenuItem value="2.0">OCPP 2.0</MenuItem>
                   <MenuItem value="2.0.1">OCPP 2.0.1</MenuItem>
                 </Select>
-              </FormControl>
+              </StyledFormControl>
               
               <TextField
                 fullWidth
@@ -379,9 +379,9 @@ const Configuration = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={2}>
-          <Typography variant="h6" className={classes.sectionTitle}>
+          <SectionTitle variant="h6">
             Ağ Ayarları
-          </Typography>
+          </SectionTitle>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <TextField
@@ -438,9 +438,9 @@ const Configuration = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={3}>
-          <Typography variant="h6" className={classes.sectionTitle}>
+          <SectionTitle variant="h6">
             Güvenlik Ayarları
-          </Typography>
+          </SectionTitle>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <FormControlLabel
@@ -468,7 +468,7 @@ const Configuration = () => {
               />
               
               {securityConfig.requireAuth && (
-                <FormControl variant="outlined" className={classes.formControl} fullWidth>
+                <StyledFormControl variant="outlined" fullWidth>
                   <InputLabel>Kimlik Doğrulama Türü</InputLabel>
                   <Select
                     name="authType"
@@ -476,11 +476,12 @@ const Configuration = () => {
                     onChange={handleSecurityChange}
                     label="Kimlik Doğrulama Türü"
                   >
+                    <MenuItem value="none">Yok</MenuItem>
                     <MenuItem value="basic">Temel Kimlik Doğrulama</MenuItem>
-                    <MenuItem value="oauth">OAuth 2.0</MenuItem>
-                    <MenuItem value="certificate">Sertifika Tabanlı</MenuItem>
+                    <MenuItem value="jwt">JWT</MenuItem>
+                    <MenuItem value="oauth2">OAuth 2.0</MenuItem>
                   </Select>
-                </FormControl>
+                </StyledFormControl>
               )}
             </Grid>
             
@@ -528,9 +529,9 @@ const Configuration = () => {
           </Grid>
         </TabPanel>
         
-        <Divider style={{ margin: '20px 0' }} />
+        <Divider sx={{ my: 2 }} />
         
-        <div className={classes.actionButtons}>
+        <ActionButtons>
           <Button
             variant="contained"
             color="primary"
@@ -545,12 +546,11 @@ const Configuration = () => {
             color="primary"
             startIcon={<RestoreIcon />}
             onClick={handleReset}
-            style={{ marginLeft: '10px' }}
           >
             Varsayılanlara Dön
           </Button>
-        </div>
-      </Paper>
+        </ActionButtons>
+      </StyledPaper>
       
       <Snackbar
         open={snackbar.open}
@@ -561,7 +561,7 @@ const Configuration = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </div>
+    </Box>
   );
 };
 

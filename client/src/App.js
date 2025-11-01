@@ -1,55 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@material-ui/core/styles';
-import CssBaseline from '@material-ui/core/CssBaseline';
-import Container from '@material-ui/core/Container';
-import Box from '@material-ui/core/Box';
-import AppBar from '@material-ui/core/AppBar';
-import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
-import DashboardIcon from '@material-ui/icons/Dashboard';
-import PowerIcon from '@material-ui/icons/Power';
-import SettingsIcon from '@material-ui/icons/Settings';
-import Divider from '@material-ui/core/Divider';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
-import { makeStyles } from '@material-ui/core/styles';
+import React from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import Container from '@mui/material/Container';
+import Box from '@mui/material/Box';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import EvStationIcon from '@mui/icons-material/EvStation';
+import SettingsIcon from '@mui/icons-material/Settings';
+import Divider from '@mui/material/Divider';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Drawer from '@mui/material/Drawer';
 import Dashboard from './components/Dashboard';
 import Stations from './components/Stations';
 import Configuration from './components/Configuration';
 
 const drawerWidth = 240;
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    display: 'flex',
-  },
-  appBar: {
-    zIndex: theme.zIndex.drawer + 1,
-  },
-  drawer: {
-    width: drawerWidth,
-    flexShrink: 0,
-  },
-  drawerPaper: {
-    width: drawerWidth,
-  },
-  content: {
-    flexGrow: 1,
-    padding: theme.spacing(3),
-  },
-  toolbar: theme.mixins.toolbar,
-}));
-
 const theme = createTheme({
   palette: {
+    mode: 'dark',
     primary: {
-      main: '#1976d2',
+      main: '#90caf9',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#f48fb1',
     },
     background: {
       default: '#f5f5f5',
@@ -57,68 +37,84 @@ const theme = createTheme({
   },
 });
 
-function App() {
-  const classes = useStyles();
-  const [activeTab, setActiveTab] = useState('dashboard');
+function Navigation() {
+  const location = useLocation();
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Stations', icon: <EvStationIcon />, path: '/stations' },
+    { text: 'Configuration', icon: <SettingsIcon />, path: '/configuration' },
+  ];
 
   return (
+    <Drawer
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+        },
+      }}
+      variant="permanent"
+      anchor="left"
+    >
+      <Toolbar />
+      <Divider />
+      <List>
+        {menuItems.map((item) => (
+          <ListItem 
+            button 
+            key={item.text} 
+            component="a" 
+            href={item.path}
+            selected={location.pathname === item.path}
+          >
+            <ListItemIcon>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItem>
+        ))}
+      </List>
+    </Drawer>
+  );
+}
+
+function App() {
+  return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <div className={classes.root}>
-          <AppBar position="fixed" className={classes.appBar}>
-            <Toolbar>
-              <Typography variant="h6" noWrap>
-                AC Şarj İstasyonu Simülatörü
-              </Typography>
-            </Toolbar>
-          </AppBar>
-          
-          <div className={classes.drawer}>
-            <div className={classes.toolbar} />
-            <Divider />
-            <List>
-              <ListItem 
-                button 
-                selected={activeTab === 'dashboard'}
-                onClick={() => setActiveTab('dashboard')}
-              >
-                <ListItemIcon><DashboardIcon /></ListItemIcon>
-                <ListItemText primary="Gösterge Paneli" />
-              </ListItem>
-              <ListItem 
-                button 
-                selected={activeTab === 'stations'}
-                onClick={() => setActiveTab('stations')}
-              >
-                <ListItemIcon><PowerIcon /></ListItemIcon>
-                <ListItemText primary="Şarj İstasyonları" />
-              </ListItem>
-              <ListItem 
-                button 
-                selected={activeTab === 'configuration'}
-                onClick={() => setActiveTab('configuration')}
-              >
-                <ListItemIcon><SettingsIcon /></ListItemIcon>
-                <ListItemText primary="Yapılandırma" />
-              </ListItem>
-            </List>
-          </div>
-          
-          <main className={classes.content}>
-            <div className={classes.toolbar} />
-            <Container maxWidth="lg">
-              <Box my={4}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/stations" element={<Stations />} />
-                  <Route path="/configuration" element={<Configuration />} />
-                </Routes>
-              </Box>
-            </Container>
-          </main>
-        </div>
-      </Router>
+      <Box sx={{ display: 'flex' }}>
+        <CssBaseline />
+        <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+          <Toolbar>
+            <Typography variant="h6" noWrap component="div">
+              AC Charging Station Simulator
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <Navigation />
+        <Box
+          component="main"
+          sx={{
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'light'
+                ? theme.palette.grey[100]
+                : theme.palette.grey[900],
+            flexGrow: 1,
+            height: '100vh',
+            overflow: 'auto',
+          }}
+        >
+          <Toolbar />
+          <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/stations" element={<Stations />} />
+              <Route path="/configuration" element={<Configuration />} />
+            </Routes>
+          </Container>
+        </Box>
+      </Box>
     </ThemeProvider>
   );
 }
