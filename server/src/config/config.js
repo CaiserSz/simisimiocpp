@@ -68,6 +68,28 @@ const config = {
     jwtSecret: process.env.JWT_SECRET,
     passwordSaltRounds: parseInt(process.env.PASSWORD_SALT_ROUNDS) || 12,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    jwtCookieExpiresIn: parseInt(process.env.JWT_COOKIE_EXPIRES_IN) || 1,
+  },
+
+  // Email configuration
+  email: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true' || false,
+    username: process.env.SMTP_USER,
+    password: process.env.SMTP_PASS,
+    fromName: process.env.EMAIL_FROM_NAME || 'EV Charging Network',
+    fromEmail: process.env.EMAIL_FROM || 'noreply@evcharging.com',
+  },
+
+  // Client configuration
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+
+  // Redis configuration
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB) || 0,
   },
 };
 

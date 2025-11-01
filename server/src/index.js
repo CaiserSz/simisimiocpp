@@ -1,17 +1,36 @@
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
+import mongoSanitize from 'express-mongo-sanitize';
+
+// Services and utilities
 import { ocppService } from './services/ocpp.service.js';
+import WebSocketServer from './services/WebSocketServer.js';
+import DatabaseManager from './utils/database.js';
 import logger from './utils/logger.js';
 import config from './config/config.js';
+
+// Error handling
+import { 
+  globalErrorHandler, 
+  handleUnhandledRejection, 
+  handleUncaughtException,
+  AppError
+} from './utils/errorHandler.js';
 
 // Import routes
 import stationRouter from './routes/station.routes.js';
 import authRouter from './routes/auth.routes.js';
 import apiRouter from './routes/api/index.js';
+
+// Setup global error handlers
+handleUnhandledRejection();
+handleUncaughtException();
 
 // Create Express application
 const app = express();
@@ -79,9 +98,58 @@ const limiter = rateLimit({
 // Apply rate limiting to API routes only
 app.use('/api/', limiter);
 
+// Performance middleware
+app.use(compression());
+
+// Security middleware
+app.use(mongoSanitize()); // Prevent NoSQL injection
+
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request ID middleware
+app.use((req, res, next) => {
+  req.id = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  res.locals.requestId = req.id;
+  res.set('X-Request-ID', req.id);
+  next();
+});
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logData = {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: `${duration}ms`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      requestId: req.id
+    };
+    
+    if (req.user) {
+      logData.userId = req.user.id;
+    }
+    
+    if (res.statusCode >= 400) {
+      logger.warn('HTTP Request:', logData);
+    } else {
+      logger.info('HTTP Request:', logData);
+    }
+  });
+  
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -97,71 +165,138 @@ app.use('/api/stations', stationRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', apiRouter);
 
-// Legacy API endpoints are now handled by the mounted routers above
+// Health check endpoint with detailed status
+app.get('/health/detailed', async (req, res) => {
+  try {
+    const dbHealth = await DatabaseManager.healthCheck();
+    const wsStats = WebSocketServer.getStatistics();
+    
+    const health = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version,
+      uptime: process.uptime(),
+      environment: config.env,
+      services: {
+        database: dbHealth,
+        websocket: wsStats,
+        ocpp: {
+          status: 'operational',
+          connectedStations: Object.keys(ocppService.getConnectedStations()).length
+        }
+      },
+      system: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        memory: process.memoryUsage(),
+        cpu: process.cpuUsage()
+      }
+    };
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  logger.error('Unhandled error:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
-  });
+    // Check if any service is unhealthy
+    if (dbHealth.status === 'unhealthy') {
+      health.status = 'unhealthy';
+      return res.status(503).json(health);
+    }
+
+    res.status(200).json(health);
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+app.use('*', (req, res, next) => {
+  const error = new AppError(`Route ${req.originalUrl} not found`, 404, 'NOT_FOUND');
+  next(error);
 });
 
-// Connect to MongoDB
-const connectToDatabase = async () => {
-  try {
-    await mongoose.connect(config.mongo.uri, config.mongo.options);
-    logger.info('Connected to MongoDB');
-  } catch (error) {
-    logger.error('MongoDB connection error:', error);
-    process.exit(1);
-  }
-};
+// Global error handler
+app.use(globalErrorHandler);
+
+// Create HTTP server for WebSocket integration
+const httpServer = createServer(app);
 
 // Start the server
 const startServer = async () => {
   try {
-    await connectToDatabase();
+    logger.info('🚀 Starting EV Charging Network Server...');
     
-    const server = app.listen(config.port, config.host, () => {
-      logger.info(`Server running on http://${config.host}:${config.port}`);
-      logger.info(`Environment: ${config.env}`);
+    // Connect to database with advanced features
+    logger.info('📊 Connecting to database...');
+    await DatabaseManager.connect();
+    await DatabaseManager.createIndexes();
+    
+    // Initialize WebSocket server
+    logger.info('🌐 Initializing WebSocket server...');
+    WebSocketServer.initialize(httpServer);
+    
+    // Start HTTP server
+    const server = httpServer.listen(config.port, config.host, () => {
+      logger.info(`✅ Server running on http://${config.host}:${config.port}`);
+      logger.info(`🌍 Environment: ${config.env}`);
+      logger.info(`📊 Database: ${config.mongo.uri}`);
+      logger.info('🎯 All systems operational!');
     });
 
     // Handle graceful shutdown
-    const shutdown = async () => {
-      logger.info('Shutting down server...');
+    const shutdown = async (signal) => {
+      logger.info(`🛑 Received ${signal}. Starting graceful shutdown...`);
       
       try {
-        // Close the HTTP server
-        await new Promise((resolve) => server.close(resolve));
+        // Stop accepting new connections
+        server.close(async () => {
+          logger.info('📡 HTTP server closed');
+          
+          // Shutdown WebSocket server
+          await WebSocketServer.shutdown();
+          
+          // Close the OCPP service
+          await ocppService.close();
+          
+          // Close database connection
+          await DatabaseManager.gracefulShutdown();
+          
+          logger.info('✅ Graceful shutdown completed');
+          process.exit(0);
+        });
+
+        // Force shutdown after timeout
+        setTimeout(() => {
+          logger.error('❌ Forced shutdown after timeout');
+          process.exit(1);
+        }, 10000); // 10 second timeout
         
-        // Close the OCPP service
-        await ocppService.close();
-        
-        // Close MongoDB connection
-        await mongoose.connection.close();
-        
-        logger.info('Server has been shut down');
-        process.exit(0);
       } catch (error) {
-        logger.error('Error during shutdown:', error);
+        logger.error('❌ Error during shutdown:', error);
         process.exit(1);
       }
     };
 
     // Handle process termination signals
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    
+    // Log initial system stats
+    setTimeout(async () => {
+      try {
+        const stats = await DatabaseManager.getStatistics();
+        logger.info('📈 Database Statistics:', stats);
+        
+        const wsStats = WebSocketServer.getStatistics();
+        logger.info('🌐 WebSocket Statistics:', wsStats);
+      } catch (error) {
+        logger.error('Error getting initial stats:', error);
+      }
+    }, 5000);
     
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
