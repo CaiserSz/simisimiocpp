@@ -248,24 +248,30 @@ export const setupCompression = (app) => {
 };
 
 /**
- * Event loop lag monitoring (reduced frequency to prevent causing lag)
+ * Event loop lag monitoring (disabled in development to prevent interference)
  */
 export const setupEventLoopMonitoring = () => {
+  // Skip event loop monitoring in development to prevent lag warnings
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('Event loop monitoring disabled in development mode');
+    return;
+  }
+
   let start = process.hrtime.bigint();
   
   const checkEventLoop = () => {
     const delta = process.hrtime.bigint() - start;
     const lag = Number(delta) / 1000000; // Convert to milliseconds
     
-    if (lag > 500) { // Only warn for significant lag (>500ms)
+    if (lag > 1000) { // Only warn for severe lag (>1s)
       logger.warn(`⚠️ Event loop lag detected: ${lag.toFixed(2)}ms`);
     }
     
     start = process.hrtime.bigint();
   };
   
-  // Check every 30 seconds instead of every second to prevent causing lag
-  setInterval(checkEventLoop, 30000);
+  // Check every 60 seconds in production
+  setInterval(checkEventLoop, 60000);
 };
 
 /**

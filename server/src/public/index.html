@@ -288,29 +288,30 @@
 
             async loadStations() {
                 try {
-                    // Hide loading spinner
-                    const loadingSpinner = document.querySelector('.loading-spinner');
-                    if (loadingSpinner) loadingSpinner.style.display = 'none';
-
+                    console.log('Loading stations...');
+                    
                     const response = await fetch('/api/simulator/stations');
                     const data = await response.json();
+                    
+                    console.log('Stations API response:', data);
                     
                     // Handle different API response formats
                     let stations = [];
                     if (data.data && data.data.stations) {
+                        console.log('Found stations object:', data.data.stations);
                         // Convert stations object to array
                         stations = Object.values(data.data.stations);
                     } else if (Array.isArray(data.data)) {
                         stations = data.data;
                     }
                     
+                    console.log('Final stations array:', stations);
                     this.renderStations(stations);
                 } catch (error) {
                     console.error('Error loading stations:', error);
                     this.showToast('Error', 'Failed to load stations', 'danger');
-                    // Hide loading spinner on error too
-                    const loadingSpinner = document.querySelector('.loading-spinner');
-                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+                    // Show empty state on error
+                    this.renderStations([]);
                 }
             }
 
@@ -409,17 +410,22 @@
 
             async createStation(formData) {
                 try {
+                    console.log('Creating station with data:', formData);
+                    
                     const response = await fetch('/api/simulator/stations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(formData)
                     });
                     
+                    console.log('Response status:', response.status);
                     const data = await response.json();
+                    console.log('Response data:', data);
                     
                     if (data.success) {
                         this.showToast('Success', 'Station created successfully', 'success');
-                        this.loadStations();
+                        // Reload stations after creation
+                        setTimeout(() => this.loadStations(), 1000);
                         document.getElementById('station-form').reset();
                     } else {
                         throw new Error(data.error || 'Failed to create station');
