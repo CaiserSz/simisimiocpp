@@ -13,6 +13,12 @@ import config from '../config/config.js';
  */
 export const authenticate = async (req, res, next) => {
   try {
+    // Skip authentication if disabled (for simple simulator usage)
+    if (!config.security.enableAuth) {
+      logger.debug('Authentication disabled - bypassing auth check');
+      return next();
+    }
+
     // Get token from header
     const authHeader = req.headers.authorization;
     
@@ -81,6 +87,12 @@ export const authenticate = async (req, res, next) => {
  */
 export const authorize = (roles = []) => {
   return (req, res, next) => {
+    // Skip authorization if authentication is disabled
+    if (!config.security.enableAuth) {
+      logger.debug('Authentication disabled - bypassing authorization check');
+      return next();
+    }
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -160,6 +172,14 @@ export const optionalAuth = async (req, res, next) => {
  */
 export const socketAuthenticate = (socket, next) => {
   try {
+    // Skip authentication if disabled
+    if (!config.security.enableAuth) {
+      logger.debug('Authentication disabled - bypassing WebSocket auth check');
+      // Create a dummy user for compatibility
+      socket.user = { id: 'anonymous', username: 'anonymous', role: 'admin' };
+      return next();
+    }
+
     const token = socket.handshake.auth?.token || 
                  socket.handshake.query?.token ||
                  (socket.handshake.headers.authorization || '').split(' ')[1];

@@ -10,19 +10,16 @@ dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 // Validate critical environment variables
 const validateConfig = () => {
-  const requiredVars = [
-    'JWT_SECRET'
-  ];
-
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-  }
-
-  // JWT Secret minimum length check
-  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    throw new Error('JWT_SECRET must be at least 32 characters long');
+  // Only validate JWT_SECRET if authentication is enabled
+  if (process.env.ENABLE_AUTH === 'true') {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is required when ENABLE_AUTH=true');
+    }
+    
+    // JWT Secret minimum length check
+    if (process.env.JWT_SECRET.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters long when authentication is enabled');
+    }
   }
 };
 
@@ -62,28 +59,19 @@ const config = {
 
   // Security configuration
   security: {
+    enableAuth: process.env.ENABLE_AUTH === 'true' || false,
     jwtSecret: process.env.JWT_SECRET,
     passwordSaltRounds: parseInt(process.env.PASSWORD_SALT_ROUNDS) || 12,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
     jwtCookieExpiresIn: parseInt(process.env.JWT_COOKIE_EXPIRES_IN) || 1,
   },
 
-  // Email configuration
-  email: {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === 'true' || false,
-    username: process.env.SMTP_USER,
-    password: process.env.SMTP_PASS,
-    fromName: process.env.EMAIL_FROM_NAME || 'EV Charging Network',
-    fromEmail: process.env.EMAIL_FROM || 'noreply@evcharging.com',
-  },
+  // Client configuration (dashboard URL)
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:9220',
 
-  // Client configuration
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
-
-  // Redis configuration
+  // Redis configuration (optional - only needed if caching enabled)
   redis: {
+    enabled: process.env.REDIS_ENABLED === 'true' || false,
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     password: process.env.REDIS_PASSWORD,
     db: parseInt(process.env.REDIS_DB) || 0,

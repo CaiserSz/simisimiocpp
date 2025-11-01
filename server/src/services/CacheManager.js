@@ -18,10 +18,17 @@ class CacheManager {
   }
 
   /**
-   * Initialize Redis connection
+   * Initialize Redis connection (only if enabled)
    */
   async initialize() {
     try {
+      // Skip Redis initialization if disabled
+      if (!config.redis.enabled) {
+        logger.info('🔴 Redis caching disabled - using in-memory cache');
+        this.isConnected = false;
+        return false;
+      }
+
       this.redis = new Redis(config.redis.url, {
         password: config.redis.password,
         db: config.redis.db,
@@ -43,6 +50,7 @@ class CacheManager {
     } catch (error) {
       logger.error('Redis connection failed:', error);
       // Graceful degradation - continue without cache
+      this.isConnected = false;
       return false;
     }
   }

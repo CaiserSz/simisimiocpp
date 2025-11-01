@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -9,7 +10,7 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test_jwt_secret_key_for_testing_only_minimum_32_characters';
 process.env.STORAGE_TYPE = 'json';
 process.env.DATA_DIR = path.join(__dirname, '../../../test-data');
-process.env.CSMS_URL = 'ws://localhost:9220';
+process.env.CSMS_URL = 'ws://localhost:9221';
 process.env.REDIS_URL = 'redis://localhost:6379/1';
 
 // Global test utilities
@@ -43,7 +44,6 @@ global.testUtils = {
   delay: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
 
   generateValidJWT: () => {
-    const jwt = require('jsonwebtoken');
     return jwt.sign(
       {
         id: 'test_user',
