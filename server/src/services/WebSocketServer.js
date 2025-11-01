@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
 import config from '../config/config.js';
 import { authenticate, socketAuthenticate } from '../middleware/auth.middleware.js';
-import stationManager from './StationManager.js';
+// StationManager removed - using SimulationManager instead
 import { simulationManager } from '../controllers/simulator.controller.js';
 
 /**
@@ -204,12 +204,12 @@ class WebSocketServer {
 
     logger.debug(`Client ${socket.id} subscribed to ${roomName}`);
 
-    // Send current station status
+    // Send current station status from simulator
     try {
-      const station = stationManager.getStation(stationId);
+      const station = simulationManager.getStation(stationId);
       socket.emit('station:status', {
         stationId,
-        data: station,
+        data: station ? station.getStatus() : null,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -245,7 +245,33 @@ class WebSocketServer {
       
       logger.info(`Station command: ${command} for ${stationId} by user ${socket.user.username}`);
 
-      const result = await stationManager.sendCommand(stationId, command, params);
+      // Station commands now handled through simulation manager
+      const station = simulationManager.getStation(stationId);
+      if (!station) {
+        socket.emit('station:command:error', { 
+          stationId, 
+          command, 
+          error: 'Station not found' 
+        });
+        return;
+      }
+      
+      // Handle specific commands
+      let result = { success: true, message: `Command ${command} executed` };
+      switch (command) {
+        case 'start':
+          await station.start();
+          break;
+        case 'stop':
+          await station.stop();
+          break;
+        case 'reset':
+          await station.stop();
+          await station.start();
+          break;
+        default:
+          result = { success: false, message: `Unknown command: ${command}` };
+      }
 
       socket.emit('station:command:result', {
         stationId,
@@ -357,49 +383,21 @@ class WebSocketServer {
     });
   }
 
-  /**
-   * Setup Station Manager integration
-   */
-  setupStationManagerIntegration() {
-    // Listen to station events
-    stationManager.on('station:connected', (data) => {
-      this.broadcastToStation(data.stationId, 'station:connected', data);
-      this.broadcastToRole('admin', 'station:connected', data);
-      this.broadcastToRole('operator', 'station:connected', data);
-    });
-
-    stationManager.on('station:disconnected', (data) => {
-      this.broadcastToStation(data.stationId, 'station:disconnected', data);
-      this.broadcastToRole('admin', 'station:disconnected', data);
-      this.broadcastToRole('operator', 'station:disconnected', data);
-    });
-
-    stationManager.on('station:status', (data) => {
-      this.broadcastToStation(data.stationId, 'station:status', data);
-    });
-
-    stationManager.on('station:meter', (data) => {
-      this.broadcastToStation(data.stationId, 'station:meter', data);
-    });
-
-    stationManager.on('station:error', (data) => {
-      this.broadcastToStation(data.stationId, 'station:error', data);
-      this.broadcastToRole('admin', 'station:error', data);
-    });
-  }
+  // Note: Station Manager integration removed - using Simulation Manager events instead
 
   /**
    * Send initial data to connected client
    */
   async sendInitialData(socket, user) {
     try {
-      // Send station summary for dashboard
-      const stations = stationManager.getAllStations();
+      // Send simulation summary for dashboard
+      const stationsStatus = simulationManager.getAllStationsStatus();
+      const stations = Object.values(stationsStatus);
       const summary = {
         total: stations.length,
-        online: stations.filter(s => s.status === 'connected').length,
-        charging: stations.filter(s => s.status === 'charging').length,
-        available: stations.filter(s => s.status === 'available').length
+        online: stations.filter(s => s.isOnline).length,
+        charging: stations.filter(s => s.connectors.some(c => c.hasActiveTransaction)).length,
+        available: stations.filter(s => s.status === 'Available').length
       };
 
       socket.emit('dashboard:summary', {

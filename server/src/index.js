@@ -9,11 +9,12 @@ import compression from 'compression';
 import mongoSanitize from 'express-mongo-sanitize';
 
 // Services and utilities
-import { ocppService } from './services/ocpp.service.js';
 import WebSocketServer from './services/WebSocketServer.js';
 import DatabaseManager from './utils/database.js';
 import logger from './utils/logger.js';
 import config from './config/config.js';
+import { initializePerformanceOptimizations } from './utils/performance.js';
+import { setupSecurity } from './middleware/security.middleware.js';
 
 // Error handling
 import { 
@@ -24,9 +25,9 @@ import {
 } from './utils/errorHandler.js';
 
 // Import routes
-import stationRouter from './routes/station.routes.js';
 import authRouter from './routes/auth.routes.js';
 import simulatorRouter from './routes/simulator.routes.js';
+import dashboardRouter from './routes/dashboard.routes.js';
 import apiRouter from './routes/api/index.js';
 
 // Setup global error handlers
@@ -35,6 +36,12 @@ handleUncaughtException();
 
 // Create Express application
 const app = express();
+
+// Initialize performance optimizations (clustering, monitoring, etc.)
+initializePerformanceOptimizations(app);
+
+// Setup enhanced security
+setupSecurity(app);
 
 // Security Middleware
 app.use(helmet({
@@ -162,9 +169,9 @@ app.get('/health', (req, res) => {
 });
 
 // Mount API routes
-app.use('/api/stations', stationRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/simulator', simulatorRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api', apiRouter);
 
 // Health check endpoint with detailed status
@@ -182,9 +189,9 @@ app.get('/health/detailed', async (req, res) => {
       services: {
         database: dbHealth,
         websocket: wsStats,
-        ocpp: {
+        simulator: {
           status: 'operational',
-          connectedStations: Object.keys(ocppService.getConnectedStations()).length
+          description: 'Station Simulator Ready'
         }
       },
       system: {
@@ -257,9 +264,6 @@ const startServer = async () => {
           
           // Shutdown WebSocket server
           await WebSocketServer.shutdown();
-          
-          // Close the OCPP service
-          await ocppService.close();
           
           // Close database connection
           await DatabaseManager.gracefulShutdown();

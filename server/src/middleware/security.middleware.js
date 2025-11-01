@@ -1,0 +1,403 @@
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import { body, validationResult } from 'express-validator';
+import crypto from 'crypto';
+import logger from '../utils/logger.js';
+
+/**
+ * Enhanced Security Middleware for Production
+ */
+
+/**
+ * Advanced rate limiting with different tiers
+ */
+export const createRateLimiter = (options = {}) => {
+  const defaults = {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false
+  };
+
+  return rateLimit({
+    ...defaults,
+    ...options,
+    handler: (req, res) => {
+      logger.warn(`Rate limit exceeded for IP: ${req.ip}`, {
+        userAgent: req.get('User-Agent'),
+        url: req.originalUrl,
+        method: req.method
+      });
+      
+      res.status(429).json({
+        success: false,
+        error: 'Too many requests, please try again later.',
+        retryAfter: Math.ceil(options.windowMs / 1000) || 900
+      });
+    }
+  });
+};
+
+/**
+ * Specialized rate limiters
+ */
+export const authRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 login attempts per 15 minutes
+  skipSuccessfulRequests: true
+});
+
+export const apiRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 1000 // 1000 API calls per 15 minutes
+});
+
+export const simulatorRateLimit = createRateLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100 // 100 simulator operations per minute
+});
+
+/**
+ * Enhanced Helmet configuration
+ */
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      scriptSrc: ["'self'", "'unsafe-eval'"], // unsafe-eval needed for Socket.IO
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Disable for WebSocket compatibility
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  noSniff: true,
+  frameguard: { action: 'deny' },
+  xssFilter: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+});
+
+/**
+ * Input validation helpers
+ */
+export const validateStationId = () => [
+  body('stationId')
+    .matches(/^[A-Z0-9_-]+$/)
+    .withMessage('Station ID must contain only uppercase letters, numbers, underscores, and hyphens')
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Station ID must be between 3 and 50 characters')
+];
+
+export const validateOCPPVersion = () => [
+  body('ocppVersion')
+    .isIn(['1.6J', '2.0.1'])
+    .withMessage('OCPP version must be 1.6J or 2.0.1')
+];
+
+export const validateConnectorCount = () => [
+  body('connectorCount')
+    .isInt({ min: 1, max: 10 })
+    .withMessage('Connector count must be between 1 and 10')
+];
+
+export const validateMaxPower = () => [
+  body('maxPower')
+    .isInt({ min: 1000, max: 1000000 })
+    .withMessage('Max power must be between 1kW and 1000kW')
+];
+
+export const validateCSMSUrl = () => [
+  body('csmsUrl')
+    .matches(/^wss?:\/\/.+/)
+    .withMessage('CSMS URL must be a valid WebSocket URL')
+];
+
+/**
+ * Request sanitization middleware
+ */
+export const sanitizeRequest = (req, res, next) => {
+  // Remove potentially dangerous fields
+  const dangerousFields = ['__proto__', 'constructor', 'prototype'];
+  
+  const sanitizeObject = (obj) => {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    
+    for (const field of dangerousFields) {
+      delete obj[field];
+    }
+    
+    for (const key in obj) {
+      obj[key] = sanitizeObject(obj[key]);
+    }
+    
+    return obj;
+  };
+
+  req.body = sanitizeObject(req.body);
+  req.query = sanitizeObject(req.query);
+  req.params = sanitizeObject(req.params);
+  
+  next();
+};
+
+/**
+ * API key validation for external access
+ */
+export const validateApiKey = (req, res, next) => {
+  const apiKey = req.header('X-API-Key');
+  
+  if (!apiKey) {
+    return res.status(401).json({
+      success: false,
+      error: 'API key required'
+    });
+  }
+
+  // Validate API key format (should be UUID v4)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  
+  if (!uuidRegex.test(apiKey)) {
+    logger.warn(`Invalid API key format from IP: ${req.ip}`);
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid API key format'
+    });
+  }
+
+  // Here you would validate against your API key database
+  // For now, we'll just check against environment variable
+  const validApiKeys = process.env.VALID_API_KEYS?.split(',') || [];
+  
+  if (!validApiKeys.includes(apiKey)) {
+    logger.warn(`Invalid API key attempt from IP: ${req.ip}`);
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid API key'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Request signature validation for webhook security
+ */
+export const validateWebhookSignature = (secret) => {
+  return (req, res, next) => {
+    const signature = req.header('X-Signature-256');
+    
+    if (!signature) {
+      return res.status(401).json({
+        success: false,
+        error: 'Signature required'
+      });
+    }
+
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(req.rawBody);
+    const expectedSignature = `sha256=${hmac.digest('hex')}`;
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      logger.warn(`Invalid webhook signature from IP: ${req.ip}`);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid signature'
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * IP whitelist middleware
+ */
+export const ipWhitelist = (allowedIPs = []) => {
+  const allowedSet = new Set(allowedIPs);
+  
+  return (req, res, next) => {
+    const clientIP = req.ip || req.connection.remoteAddress;
+    
+    if (allowedIPs.length > 0 && !allowedSet.has(clientIP)) {
+      logger.warn(`Blocked request from unauthorized IP: ${clientIP}`);
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Request size limiting
+ */
+export const requestSizeLimit = (maxSize = '10mb') => {
+  return (req, res, next) => {
+    const contentLength = parseInt(req.get('content-length') || '0');
+    const maxSizeBytes = parseInt(maxSize.replace(/mb|kb/i, '')) * (maxSize.includes('mb') ? 1024 * 1024 : 1024);
+    
+    if (contentLength > maxSizeBytes) {
+      logger.warn(`Request too large from IP: ${req.ip}, Size: ${contentLength} bytes`);
+      return res.status(413).json({
+        success: false,
+        error: 'Request entity too large'
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Security event logger
+ */
+export const logSecurityEvent = (event, req, additional = {}) => {
+  logger.warn(`🔒 Security Event: ${event}`, {
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    url: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    userId: req.user?.id,
+    ...additional
+  });
+};
+
+/**
+ * Brute force protection
+ */
+class BruteForceProtection {
+  constructor() {
+    this.attempts = new Map(); // IP -> { count, lastAttempt, blocked }
+    this.maxAttempts = 10;
+    this.blockDuration = 30 * 60 * 1000; // 30 minutes
+    this.windowDuration = 15 * 60 * 1000; // 15 minutes
+    
+    // Cleanup old entries every hour
+    setInterval(() => this.cleanup(), 60 * 60 * 1000);
+  }
+
+  isBlocked(ip) {
+    const record = this.attempts.get(ip);
+    if (!record) return false;
+
+    // Check if block period has expired
+    if (record.blocked && Date.now() - record.lastAttempt > this.blockDuration) {
+      this.attempts.delete(ip);
+      return false;
+    }
+
+    return record.blocked;
+  }
+
+  recordAttempt(ip, success = false) {
+    const now = Date.now();
+    const record = this.attempts.get(ip) || { count: 0, lastAttempt: now, blocked: false };
+
+    if (success) {
+      // Reset on successful attempt
+      this.attempts.delete(ip);
+      return;
+    }
+
+    // Reset count if window expired
+    if (now - record.lastAttempt > this.windowDuration) {
+      record.count = 1;
+    } else {
+      record.count++;
+    }
+
+    record.lastAttempt = now;
+
+    // Block if max attempts reached
+    if (record.count >= this.maxAttempts) {
+      record.blocked = true;
+      logger.warn(`🔒 IP blocked due to brute force: ${ip}`);
+    }
+
+    this.attempts.set(ip, record);
+  }
+
+  cleanup() {
+    const now = Date.now();
+    for (const [ip, record] of this.attempts) {
+      if (now - record.lastAttempt > this.blockDuration) {
+        this.attempts.delete(ip);
+      }
+    }
+  }
+
+  getStats() {
+    return {
+      totalAttempts: this.attempts.size,
+      blockedIPs: Array.from(this.attempts.values()).filter(r => r.blocked).length
+    };
+  }
+}
+
+export const bruteForceProtection = new BruteForceProtection();
+
+/**
+ * Brute force middleware
+ */
+export const bruteForceMiddleware = (req, res, next) => {
+  const ip = req.ip;
+  
+  if (bruteForceProtection.isBlocked(ip)) {
+    logSecurityEvent('BRUTE_FORCE_BLOCKED', req);
+    return res.status(429).json({
+      success: false,
+      error: 'Too many failed attempts. Please try again later.',
+      retryAfter: 1800 // 30 minutes
+    });
+  }
+
+  // Hook into response to record attempt result
+  const originalSend = res.send;
+  res.send = function(data) {
+    const success = res.statusCode < 400;
+    bruteForceProtection.recordAttempt(ip, success);
+    originalSend.call(this, data);
+  };
+
+  next();
+};
+
+/**
+ * Complete security middleware setup
+ */
+export const setupSecurity = (app) => {
+  logger.info('🔒 Setting up security middleware...');
+  
+  // Basic security headers
+  app.use(securityHeaders);
+  
+  // Request sanitization
+  app.use(sanitizeRequest);
+  
+  // Request size limiting
+  app.use(requestSizeLimit('10mb'));
+  
+  // Rate limiting for different routes
+  app.use('/api/auth', authRateLimit);
+  app.use('/api/simulator', simulatorRateLimit);
+  app.use('/api', apiRateLimit);
+  
+  // Brute force protection for auth routes
+  app.use('/api/auth', bruteForceMiddleware);
+  
+  logger.info('✅ Security middleware configured');
+};

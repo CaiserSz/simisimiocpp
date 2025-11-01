@@ -33,47 +33,42 @@ services:
     depends_on:
       - mongo
 
-  app:
+  simulator:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: charging_app
+    container_name: ev_station_simulator
     restart: always
     environment:
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongo:27017/${MONGO_DATABASE:-charging_simulator}?authSource=admin
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
-      - JWT_EXPIRE=30d
-      - OCPP_PORT=9220
+      - PORT=3001
+      - HOST=0.0.0.0
+      - MONGODB_URI=mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongo:27017/${MONGO_DATABASE:-ev_simulator}?authSource=admin
+      - JWT_SECRET=${JWT_SECRET:-your_super_secure_jwt_secret_key_minimum_64_characters}
+      - JWT_EXPIRES_IN=24h
+      - REDIS_URL=redis://redis:6379
+      - CSMS_URL=${CSMS_URL:-ws://host.docker.internal:9220}
+      - LOG_LEVEL=info
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
     ports:
-      - "3000:3000"
-      - "9220:9220"
+      - "3001:3001"
     volumes:
       - ./logs:/app/logs
+      - ./server/src/templates:/app/server/src/templates
     depends_on:
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  nginx:
-    image: nginx:alpine
-    container_name: charging_nginx
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./client/build:/usr/share/nginx/html:ro
-    depends_on:
-      - app
+  # Nginx removed - Station Simulator doesn't need frontend serving
 
   redis:
     image: redis:alpine
@@ -101,14 +96,14 @@ services:
       - ./monitoring/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     depends_on:
-      - app
+      - simulator
 
   grafana:
     image: grafana/grafana:latest
-    container_name: charging_grafana
+    container_name: simulator_grafana
     restart: always
     ports:
-      - "3001:3000"
+      - "3002:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
@@ -118,6 +113,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
+      - simulator
 
 volumes:
   mongo_data:
