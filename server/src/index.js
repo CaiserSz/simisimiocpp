@@ -15,6 +15,7 @@ import logger from './utils/logger.js';
 import config from './config/config.js';
 import { initializePerformanceOptimizations } from './utils/performance.js';
 import { setupSecurity } from './middleware/security.middleware.js';
+import metricsCollector from './middleware/metrics.middleware.js';
 
 // Error handling
 import { 
@@ -109,6 +110,9 @@ app.use('/api/', limiter);
 // Performance middleware
 app.use(compression());
 
+// Metrics middleware
+app.use(metricsCollector.requestMetricsMiddleware());
+
 // Security middleware
 app.use(mongoSanitize()); // Prevent NoSQL injection
 
@@ -166,6 +170,35 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version,
   });
+});
+
+// Prometheus metrics endpoint
+app.get('/health/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', metricsCollector.register.contentType);
+    const metrics = await metricsCollector.getMetrics();
+    res.end(metrics);
+  } catch (error) {
+    logger.error('Error serving metrics:', error);
+    res.status(500).end('Error serving metrics');
+  }
+});
+
+// Metrics summary endpoint for dashboard
+app.get('/health/metrics/summary', async (req, res) => {
+  try {
+    const summary = await metricsCollector.getMetricsSummary();
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    logger.error('Error getting metrics summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get metrics summary'
+    });
+  }
 });
 
 // Mount API routes

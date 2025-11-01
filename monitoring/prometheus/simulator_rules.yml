@@ -1,0 +1,184 @@
+groups:
+  - name: ev-simulator.rules
+    rules:
+      # Application Health Rules
+      - alert: SimulatorDown
+        expr: up{job="ev-simulator"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "EV Simulator is down"
+          description: "EV Simulator has been down for more than 30 seconds."
+
+      - alert: HighResponseTime
+        expr: http_request_duration_seconds{quantile="0.95"} > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      # Station Simulation Rules
+      - alert: TooManyStations
+        expr: simulator_active_stations > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many active stations"
+          description: "{{ $value }} stations are currently active (>100)"
+
+      - alert: LowStationUtilization
+        expr: simulator_station_utilization < 0.1
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low station utilization"
+          description: "Station utilization is {{ $value | humanizePercentage }}"
+
+      - alert: HighPowerConsumption
+        expr: simulator_total_power_kw > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High power consumption"
+          description: "Total power consumption is {{ $value }}kW"
+
+      # Performance Rules
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 > 512
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB (>512MB)"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # Database Rules
+      - alert: MongoDBDown
+        expr: up{job="mongodb"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB has been down for more than 30 seconds."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 30 seconds."
+
+      # WebSocket Rules
+      - alert: TooManyWebSocketConnections
+        expr: websocket_connections_active > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many WebSocket connections"
+          description: "{{ $value }} WebSocket connections are active"
+
+      - alert: WebSocketConnectionErrors
+        expr: rate(websocket_connection_errors_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket connection error rate"
+          description: "{{ $value }} WebSocket connection errors per second"
+
+      # OCPP Protocol Rules
+      - alert: OCPPMessageFailures
+        expr: rate(ocpp_message_failures_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OCPP message failures detected"
+          description: "{{ $value }} OCPP message failures per second"
+
+      - alert: CSMSConnectionLoss
+        expr: increase(csms_reconnection_attempts_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Frequent CSMS reconnection attempts"
+          description: "{{ $value }} CSMS reconnection attempts in the last 5 minutes"
+
+  - name: business.rules
+    rules:
+      # Business Metrics
+      - record: simulator:charging_sessions_per_hour
+        expr: rate(simulator_charging_sessions_total[1h]) * 3600
+
+      - record: simulator:energy_delivered_per_hour
+        expr: rate(simulator_energy_delivered_kwh_total[1h]) * 3600
+
+      - record: simulator:average_session_duration
+        expr: simulator_total_session_duration_seconds / simulator_charging_sessions_total
+
+      - record: simulator:station_utilization_rate
+        expr: simulator_active_connectors / simulator_total_connectors
+
+      - record: simulator:protocol_distribution
+        expr: |
+          (
+            count by (protocol) (simulator_stations{protocol="1.6J"}) or
+            count by (protocol) (simulator_stations{protocol="2.0.1"})
+          ) / 
+          count(simulator_stations)
+
+  - name: sla.rules
+    rules:
+      # SLA Metrics
+      - record: simulator:availability_24h
+        expr: avg_over_time(up{job="ev-simulator"}[24h])
+
+      - record: simulator:error_rate_24h
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[24h])) /
+            sum(rate(http_requests_total[24h]))
+          ) or vector(0)
+
+      - record: simulator:response_time_p95_24h
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[24h]))
+
+      # Performance Baselines
+      - record: simulator:baseline_response_time
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[7d]))
+
+      - record: simulator:baseline_error_rate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[7d])) /
+            sum(rate(http_requests_total[7d]))
+          ) or vector(0)
