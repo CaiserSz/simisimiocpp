@@ -10,16 +10,16 @@
 - [ ] Helmet.js security headers active
 - [ ] Input sanitization enabled
 - [ ] SSL/TLS certificates installed
-- [ ] Database connection encrypted
+- [ ] JSON storage files encrypted at rest
 - [ ] No hard-coded credentials in code
 - [ ] Security audit passed
 
-### ✅ Database
-- [ ] Production MongoDB cluster configured
-- [ ] Database indexes created
-- [ ] Connection pooling optimized
-- [ ] Backup strategy implemented
-- [ ] Monitoring alerts configured
+### ✅ Storage & Data
+- [ ] JSON storage directory secured (/app/data)
+- [ ] File backup strategy implemented (automated)
+- [ ] Storage monitoring alerts configured
+- [ ] User data encryption at rest
+- [ ] Data retention policies defined
 - [ ] Performance baselines established
 
 ### ✅ Infrastructure
@@ -80,8 +80,9 @@ NODE_ENV=production
 PORT=3001
 HOST=0.0.0.0
 
-# Database
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/production
+# Storage (JSON-based)
+STORAGE_TYPE=json
+DATA_DIR=/app/data
 
 # Security (CRITICAL - Generate secure values)
 JWT_SECRET=your_super_secure_64_character_secret_key_here_for_production

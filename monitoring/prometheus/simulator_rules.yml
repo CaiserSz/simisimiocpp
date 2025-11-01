@@ -76,16 +76,7 @@ groups:
           summary: "High CPU usage"
           description: "CPU usage is {{ $value }}%"
 
-      # Database Rules
-      - alert: MongoDBDown
-        expr: up{job="mongodb"} == 0
-        for: 30s
-        labels:
-          severity: critical
-        annotations:
-          summary: "MongoDB is down"
-          description: "MongoDB has been down for more than 30 seconds."
-
+      # Storage & Cache Rules
       - alert: RedisDown
         expr: up{job="redis"} == 0
         for: 30s

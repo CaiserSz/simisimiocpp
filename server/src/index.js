@@ -5,7 +5,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
-import mongoSanitize from 'express-mongo-sanitize';
 
 // Services and utilities
 import WebSocketServer from './services/WebSocketServer.js';
@@ -113,7 +112,7 @@ app.use(compression());
 app.use(metricsCollector.requestMetricsMiddleware());
 
 // Security middleware
-app.use(mongoSanitize()); // Prevent NoSQL injection
+// NoSQL injection prevention no longer needed with JSON storage
 
 // Body parsing middleware
 app.use(express.json({ 

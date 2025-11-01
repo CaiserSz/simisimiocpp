@@ -29,7 +29,6 @@ Bu simulator gerçek EV şarj istasyonlarının davranışını simüle eder ve 
 ### Prerequisites
 
 - **Node.js** >= 20.0.0
-- **MongoDB** >= 6.0
 - **Redis** >= 7.0 (optional, for caching)
 - **CSMS Server** (for testing connections)
 
@@ -68,8 +67,9 @@ NODE_ENV=development
 PORT=3001
 HOST=0.0.0.0
 
-# Database
-MONGODB_URI=mongodb://localhost:27017/ev-simulator
+# Storage (JSON-based - no database needed!)
+STORAGE_TYPE=json
+DATA_DIR=./src/data
 
 # Security (CRITICAL - Generate secure values)
 JWT_SECRET=your_super_secure_64_character_secret_key_here
@@ -367,8 +367,9 @@ NODE_ENV=production
 PORT=3001
 HOST=0.0.0.0
 
-# Secure MongoDB connection
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/production
+# JSON Storage (Production)
+STORAGE_TYPE=json
+DATA_DIR=/app/data
 
 # Strong JWT secret (min 64 characters)
 JWT_SECRET=your_super_secure_production_jwt_secret_key_minimum_64_characters
@@ -578,7 +579,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Open Charge Alliance](https://www.openchargealliance.org/) for OCPP specifications
 - [Socket.IO](https://socket.io/) for real-time communication
 - [Express.js](https://expressjs.com/) for the web framework
-- [MongoDB](https://www.mongodb.com/) for data persistence
 - [Redis](https://redis.io/) for caching and performance
 
 ---

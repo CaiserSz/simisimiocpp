@@ -51,7 +51,7 @@ cd server && npm install
 cp .env.example .env
 
 # Gerekli environment variable'ları ayarla
-# JWT_SECRET, MONGODB_URI, CSMS_URL vs.
+# JWT_SECRET, CSMS_URL, STORAGE_TYPE vs.
 
 # Uygulamayı başlat
 npm run dev

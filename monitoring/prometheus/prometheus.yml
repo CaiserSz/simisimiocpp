@@ -37,12 +37,6 @@ scrape_configs:
     metrics_path: "/health/detailed"
     scrape_interval: 30s
 
-  # MongoDB Metrics
-  - job_name: "mongodb"
-    static_configs:
-      - targets: ["mongo:27017"]
-    metrics_path: "/metrics"
-
   # Redis Metrics
   - job_name: "redis"
     static_configs:
