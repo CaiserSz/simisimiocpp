@@ -26,6 +26,7 @@ import {
 // Import routes
 import stationRouter from './routes/station.routes.js';
 import authRouter from './routes/auth.routes.js';
+import simulatorRouter from './routes/simulator.routes.js';
 import apiRouter from './routes/api/index.js';
 
 // Setup global error handlers
@@ -163,6 +164,7 @@ app.get('/health', (req, res) => {
 // Mount API routes
 app.use('/api/stations', stationRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/simulator', simulatorRouter);
 app.use('/api', apiRouter);
 
 // Health check endpoint with detailed status

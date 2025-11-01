@@ -4,6 +4,7 @@ import logger from '../utils/logger.js';
 import config from '../config/config.js';
 import { authenticate, socketAuthenticate } from '../middleware/auth.middleware.js';
 import stationManager from './StationManager.js';
+import { simulationManager } from '../controllers/simulator.controller.js';
 
 /**
  * Enterprise WebSocket Server for Real-time Communication
@@ -37,6 +38,7 @@ class WebSocketServer {
     this.setupMiddleware();
     this.setupEventHandlers();
     this.setupStationManagerIntegration();
+    this.setupSimulatorIntegration();
 
     logger.info('🚀 WebSocket Server initialized');
     return this.io;
@@ -300,6 +302,59 @@ class WebSocketServer {
     this.io.to(`chat:${room}`).emit('chat:message', chatData);
 
     logger.debug(`Chat message from ${user.username} in ${room}: ${message}`);
+  }
+
+  /**
+   * Setup Simulator integration
+   */
+  setupSimulatorIntegration() {
+    // Listen to simulator events
+    simulationManager.on('simulationStarted', (data) => {
+      this.broadcastToRole('admin', 'simulation:started', data);
+      this.broadcastToRole('operator', 'simulation:started', data);
+    });
+
+    simulationManager.on('simulationStopped', (data) => {
+      this.broadcastToRole('admin', 'simulation:stopped', data);
+      this.broadcastToRole('operator', 'simulation:stopped', data);
+    });
+
+    simulationManager.on('stationCreated', (data) => {
+      this.broadcastToRole('admin', 'station:created', data);
+      this.broadcastToRole('operator', 'station:created', data);
+    });
+
+    simulationManager.on('stationStarted', (data) => {
+      this.broadcastToAll('station:started', data);
+    });
+
+    simulationManager.on('stationStopped', (data) => {
+      this.broadcastToAll('station:stopped', data);
+    });
+
+    simulationManager.on('chargingStarted', (data) => {
+      this.broadcastToAll('charging:started', data);
+      this.broadcastToStation(data.stationId, 'charging:started', data);
+    });
+
+    simulationManager.on('chargingStopped', (data) => {
+      this.broadcastToAll('charging:stopped', data);
+      this.broadcastToStation(data.stationId, 'charging:stopped', data);
+    });
+
+    simulationManager.on('meterValues', (data) => {
+      this.broadcastToStation(data.stationId, 'meter:values', data);
+    });
+
+    simulationManager.on('scenarioStarted', (data) => {
+      this.broadcastToRole('admin', 'scenario:started', data);
+      this.broadcastToRole('operator', 'scenario:started', data);
+    });
+
+    simulationManager.on('scenarioEvent', (data) => {
+      this.broadcastToRole('admin', 'scenario:event', data);
+      this.broadcastToRole('operator', 'scenario:event', data);
+    });
   }
 
   /**
