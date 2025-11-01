@@ -11,12 +11,14 @@
   "scripts": {
     "start": "node --experimental-modules src/index.js",
     "dev": "nodemon --experimental-modules src/index.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=__tests__/controllers",
-    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=__tests__/integration",
-    "test:csms": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=csms-connection.test.js",
-    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "test": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --detectOpenHandles",
+    "test:unit": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=__tests__/controllers --runInBand",
+    "test:integration": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=__tests__/integration --runInBand",
+    "test:csms": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=csms-connection.test.js --runInBand",
+    "test:watch": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --watch --runInBand",
+    "test:coverage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand",
+    "test:json-storage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimpleUserStore|auth.controller.updated' --runInBand",
+    "test:simulator": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimulationManager|WebSocketServer' --runInBand",
     "lint": "eslint . --ext .js",
     "format": "prettier --write ."
   },
@@ -43,16 +45,38 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "babel-jest": "^29.7.0",
+    "cross-env": "^7.0.3",
     "eslint": "^8.51.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-import": "^2.28.1",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.0.3",
+    "socket.io-client": "^4.7.4",
     "supertest": "^6.3.3"
   },
   "jest": {
+    "preset": "babel-jest",
     "testEnvironment": "node",
-    "transform": {}
+    "extensionsToTreatAsEsm": [".js"],
+    "transform": {},
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/__tests__/**",
+      "!src/index.js",
+      "!src/**/*.test.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "setupFilesAfterEnv": ["<rootDir>/src/__tests__/setup.updated.js"],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
   }
 }
