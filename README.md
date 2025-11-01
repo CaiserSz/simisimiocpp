@@ -178,7 +178,7 @@ curl -X POST http://localhost:3001/api/simulator/stations/{stationId}/connectors
 
 ## 🏗️ Architecture
 
-```
+```text
 ┌─────────────────┐    WebSocket    ┌─────────────────┐
 │   CSMS Server   │ ←──────────────→ │ Station Sim #1  │
 │   (External)    │                 │   (OCPP 1.6J)   │
@@ -442,7 +442,7 @@ k6 run --vus 100 --duration 5m performance-tests/load-test.js
 
 ### Project Structure
 
-```
+```text
 server/
 ├── src/
 │   ├── controllers/        # API controllers

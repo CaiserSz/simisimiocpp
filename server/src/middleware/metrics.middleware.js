@@ -160,8 +160,8 @@ class MetricsCollector {
     let path = req.path || req.url;
     
     // Replace common ID patterns
-    path = path.replace(/\/[0-9a-fA-F]{24}/g, '/:id'); // MongoDB ObjectId
     path = path.replace(/\/\d+/g, '/:id'); // Numeric IDs
+    path = path.replace(/\/[a-zA-Z0-9_-]+/g, '/:id'); // Alphanumeric IDs (JSON storage)
     path = path.replace(/\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '/:uuid'); // UUIDs
     
     return path;

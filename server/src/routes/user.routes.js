@@ -41,16 +41,16 @@ router
 router
   .route('/:id')
   .get(
-    param('id').isMongoId().withMessage('Invalid user ID'),
+    param('id').isAlphanumeric().withMessage('Invalid user ID'),
     getUser
   )
   .put(
-    param('id').isMongoId().withMessage('Invalid user ID'),
+    param('id').isAlphanumeric().withMessage('Invalid user ID'),
     ...validateUserUpdate,
     updateUser
   )
   .delete(
-    param('id').isMongoId().withMessage('Invalid user ID'),
+    param('id').isAlphanumeric().withMessage('Invalid user ID'),
     deleteUser
   );
 
@@ -58,7 +58,7 @@ router
 router.put(
   '/:id/role',
   [
-    param('id').isMongoId().withMessage('Invalid user ID'),
+    param('id').isAlphanumeric().withMessage('Invalid user ID'),
     body('role').isIn(['admin', 'operator', 'customer']).withMessage('Invalid role'),
   ],
   updateUserRole
@@ -68,7 +68,7 @@ router.put(
 router.put(
   '/:id/status',
   [
-    param('id').isMongoId().withMessage('Invalid user ID'),
+    param('id').isAlphanumeric().withMessage('Invalid user ID'),
     body('isActive').isBoolean().withMessage('isActive must be a boolean'),
   ],
   updateUserStatus
@@ -77,7 +77,7 @@ router.put(
 // Get user transactions
 router.get(
   '/:id/transactions',
-  param('id').isMongoId().withMessage('Invalid user ID'),
+  param('id').isAlphanumeric().withMessage('Invalid user ID'),
   getUserTransactions
 );
 

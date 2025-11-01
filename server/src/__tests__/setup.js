@@ -1,40 +1,22 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// Legacy test setup file - now using setup.updated.js for JSON storage testing
+// This file is kept for compatibility but most tests should use the new setup
+
 import logger from '../utils/logger.js';
 
-let mongoServer;
-
-// Setup test database
+// JSON Storage test setup - no external database needed
 beforeAll(async () => {
-  // Start in-memory MongoDB instance
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  
-  await mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
-  
-  logger.info('Test database connected');
+  logger.info('JSON storage test environment initialized');
 });
 
 // Cleanup after each test
 afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  
-  for (const key in collections) {
-    const collection = collections[key];
-    await collection.deleteMany({});
-  }
+  // Clean up any test data files if needed
+  // JSON storage cleanup is handled by individual test suites
 });
 
 // Cleanup after all tests
 afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.connection.close();
-  await mongoServer.stop();
-  
-  logger.info('Test database disconnected');
+  logger.info('JSON storage test environment cleaned up');
 });
 
 // Global test utilities
