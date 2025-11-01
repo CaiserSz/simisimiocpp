@@ -246,7 +246,7 @@ export const setupCompression = (app) => {
 };
 
 /**
- * Event loop lag monitoring
+ * Event loop lag monitoring (reduced frequency to prevent causing lag)
  */
 export const setupEventLoopMonitoring = () => {
   let start = process.hrtime.bigint();
@@ -255,15 +255,15 @@ export const setupEventLoopMonitoring = () => {
     const delta = process.hrtime.bigint() - start;
     const lag = Number(delta) / 1000000; // Convert to milliseconds
     
-    if (lag > 100) { // >100ms lag
+    if (lag > 500) { // Only warn for significant lag (>500ms)
       logger.warn(`⚠️ Event loop lag detected: ${lag.toFixed(2)}ms`);
     }
     
     start = process.hrtime.bigint();
   };
   
-  // Check every second
-  setInterval(checkEventLoop, 1000);
+  // Check every 30 seconds instead of every second to prevent causing lag
+  setInterval(checkEventLoop, 30000);
 };
 
 /**

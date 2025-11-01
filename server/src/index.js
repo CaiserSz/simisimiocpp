@@ -166,12 +166,14 @@ app.use((req, res, next) => {
 // Static dashboard middleware
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use('/dashboard', express.static(path.join(__dirname, 'public')));
 
-// Dashboard root redirect
+// Dashboard redirect to index.html
 app.get('/dashboard', (req, res) => {
-  res.redirect('/dashboard/');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Static assets for dashboard
+app.use('/dashboard', express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -221,7 +223,7 @@ app.use('/api', apiRouter);
 app.get('/health/detailed', async (req, res) => {
   try {
     const dbHealth = await DatabaseManager.healthCheck();
-    const wsStats = WebSocketServer.getStatistics();
+    const wsStats = global.wsServerInstance ? global.wsServerInstance.getStatistics() : { error: 'WebSocket not initialized' };
     
     const health = {
       status: 'healthy',
@@ -292,6 +294,9 @@ const startServer = async () => {
     // Start dashboard periodic updates
     wsServer.startDashboardUpdates();
     
+    // Store wsServer globally for stats access
+    global.wsServerInstance = wsServer;
+    
     // Start HTTP server
     const server = httpServer.listen(config.port, config.host, () => {
       logger.info(`✅ Server running on http://${config.host}:${config.port}`);
@@ -335,18 +340,20 @@ const startServer = async () => {
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
     
-    // Log initial system stats
-    setTimeout(async () => {
+    // Start monitoring (reduced frequency to avoid event loop lag)
+    setInterval(async () => {
       try {
         const stats = await DatabaseManager.getStatistics();
-        logger.info('📈 Database Statistics:', stats);
+        logger.debug('📈 Database Statistics:', stats);
         
-        const wsStats = WebSocketServer.getStatistics();
-        logger.info('🌐 WebSocket Statistics:', wsStats);
+        if (global.wsServerInstance && typeof global.wsServerInstance.getStatistics === 'function') {
+          const wsStats = global.wsServerInstance.getStatistics();
+          logger.debug('🌐 WebSocket Statistics:', wsStats);
+        }
       } catch (error) {
-        logger.error('Error getting initial stats:', error);
+        logger.error('Error getting periodic stats:', error);
       }
-    }, 5000);
+    }, 30000); // Changed from 5s to 30s to reduce load
     
   } catch (error) {
     logger.error('❌ Failed to start server:', error);

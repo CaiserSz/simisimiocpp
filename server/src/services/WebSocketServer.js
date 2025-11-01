@@ -606,7 +606,7 @@ class WebSocketServer {
   startDashboardUpdates() {
     setInterval(() => {
       this.sendDashboardUpdate();
-    }, 5000); // Update every 5 seconds
+    }, 15000); // Update every 15 seconds (reduced from 5s to prevent event loop lag)
   }
 }
 
