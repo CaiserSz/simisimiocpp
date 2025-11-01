@@ -139,6 +139,16 @@ class WebSocketServer {
       this.handleStationUnsubscription(socket, data);
     });
 
+    // Dashboard-specific events
+    socket.on('dashboard:subscribe', () => {
+      socket.join('dashboard');
+      logger.info(`Dashboard subscription: ${socket.id}`);
+    });
+
+    socket.on('dashboard:request_update', () => {
+      this.sendDashboardUpdate(socket);
+    });
+
     // Handle real-time station commands (admin/operator only)
     socket.on('station:command', async (data) => {
       if (['admin', 'operator'].includes(user.role)) {
@@ -499,11 +509,105 @@ class WebSocketServer {
     // Wait a moment for messages to be sent
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Close all connections
-    this.io.close();
-    
-    logger.info('WebSocket server shutdown complete');
+  }
+
+  /**
+   * Dashboard-specific methods
+   */
+  
+  /**
+   * Send dashboard update to specific socket or all dashboard subscribers
+   */
+  async sendDashboardUpdate(socket = null) {
+    try {
+      // Get current system stats (would integrate with actual simulator)
+      const dashboardData = {
+        type: 'dashboard_update',
+        timestamp: new Date().toISOString(),
+        stats: {
+          totalStations: 0,
+          onlineStations: 0,
+          chargingSessions: 0,
+          totalPower: 0
+        },
+        stations: [] // Would get from simulation manager
+      };
+
+      if (socket) {
+        socket.emit('dashboard:update', dashboardData);
+      } else {
+        this.io.to('dashboard').emit('dashboard:update', dashboardData);
+      }
+    } catch (error) {
+      logger.error('Error sending dashboard update:', error);
+    }
+  }
+
+  /**
+   * Handle station command from dashboard
+   */
+  async handleStationCommand(socket, data) {
+    try {
+      const { stationId, command, params } = data;
+      
+      logger.info(`Station command from ${socket.user.username}: ${command} on ${stationId}`);
+      
+      // Here we would integrate with the actual simulator
+      // For now, just acknowledge the command
+      socket.emit('station:command_result', {
+        success: true,
+        stationId,
+        command,
+        message: `Command ${command} executed on station ${stationId}`
+      });
+
+      // Broadcast station update to dashboard subscribers
+      this.broadcastStationUpdate(stationId, {
+        status: command === 'start' ? 'online' : 'offline',
+        lastCommand: command,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('Error handling station command:', error);
+      socket.emit('station:command_result', {
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Broadcast station update to dashboard
+   */
+  broadcastStationUpdate(stationId, updateData) {
+    this.io.to('dashboard').emit('station:update', {
+      type: 'station_update',
+      stationId,
+      update: updateData,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Broadcast metrics update to dashboard
+   */
+  broadcastMetricsUpdate(metrics) {
+    this.io.to('dashboard').emit('metrics:update', {
+      type: 'metrics_update',
+      metrics,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Start periodic dashboard updates
+   */
+  startDashboardUpdates() {
+    setInterval(() => {
+      this.sendDashboardUpdate();
+    }, 5000); // Update every 5 seconds
   }
 }
 
-export default new WebSocketServer();
+export default WebSocketServer;

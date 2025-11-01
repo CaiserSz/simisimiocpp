@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔌 EV Station Simulator Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .station-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #28a745;
+        }
+        .station-card.offline {
+            border-left-color: #dc3545;
+        }
+        .station-card.charging {
+            border-left-color: #ffc107;
+        }
+        .metrics-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .status-online { color: #28a745; }
+        .status-offline { color: #dc3545; }
+        .status-charging { color: #ffc107; }
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .connection-status {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="bi bi-lightning-charge"></i>
+                EV Station Simulator
+            </span>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-success me-3" id="connection-status">
+                    <i class="bi bi-wifi"></i> Connected
+                </span>
+                <button class="btn btn-outline-light btn-sm" onclick="refreshData()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Connection Status Alert -->
+    <div class="connection-status">
+        <div class="alert alert-danger alert-dismissible fade" id="connection-alert" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            Connection lost. Trying to reconnect...
+            <div class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></div>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-4">
+        <!-- System Overview -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card metrics-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-broadcast fs-1"></i>
+                        <h4 class="mt-2" id="total-stations">0</h4>
+                        <p class="mb-0">Total Stations</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle fs-1"></i>
+                        <h4 class="mt-2" id="online-stations">0</h4>
+                        <p class="mb-0">Online</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-battery-charging fs-1"></i>
+                        <h4 class="mt-2" id="charging-sessions">0</h4>
+                        <p class="mb-0">Active Sessions</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-lightning fs-1"></i>
+                        <h4 class="mt-2" id="total-power">0 kW</h4>
+                        <p class="mb-0">Total Power</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-plus-circle"></i> Quick Station Control</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="station-form" class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Station ID</label>
+                                <input type="text" class="form-control" id="station-id" placeholder="STATION_001" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">OCPP Version</label>
+                                <select class="form-select" id="ocpp-version">
+                                    <option value="1.6J">OCPP 1.6J</option>
+                                    <option value="2.0.1" selected>OCPP 2.0.1</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Vendor</label>
+                                <input type="text" class="form-control" id="vendor" value="SimVendor" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Max Power (kW)</label>
+                                <input type="number" class="form-control" id="max-power" value="22" min="1" max="350">
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-play-circle"></i> Create & Start Station
+                                </button>
+                                <button type="button" class="btn btn-success ms-2" onclick="startAllStations()">
+                                    <i class="bi bi-play-fill"></i> Start All
+                                </button>
+                                <button type="button" class="btn btn-warning ms-2" onclick="stopAllStations()">
+                                    <i class="bi bi-stop-fill"></i> Stop All
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-bar-chart"></i> Real-time Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="metrics-chart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stations Grid -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-grid"></i> Station Management</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadStations()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row" id="stations-grid">
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Loading stations...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container"></div>
+
+    <script>
+        class EVSimulatorDashboard {
+            constructor() {
+                this.ws = null;
+                this.stations = new Map();
+                this.metrics = { power: [], energy: [], sessions: [] };
+                this.chart = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                
+                this.initializeWebSocket();
+                this.initializeChart();
+                this.loadStations();
+                this.setupEventListeners();
+            }
+
+            initializeWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}`;
+                
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    console.log('WebSocket connected');
+                    this.updateConnectionStatus(true);
+                    this.reconnectAttempts = 0;
+                };
+                
+                this.ws.onmessage = (event) => {
+                    this.handleWebSocketMessage(JSON.parse(event.data));
+                };
+                
+                this.ws.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    this.updateConnectionStatus(false);
+                    this.attemptReconnect();
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.showToast('WebSocket Error', 'Connection error occurred', 'danger');
+                };
+            }
+
+            updateConnectionStatus(connected) {
+                const statusBadge = document.getElementById('connection-status');
+                const connectionAlert = document.getElementById('connection-alert');
+                
+                if (connected) {
+                    statusBadge.className = 'badge bg-success me-3';
+                    statusBadge.innerHTML = '<i class="bi bi-wifi"></i> Connected';
+                    connectionAlert.classList.remove('show');
+                } else {
+                    statusBadge.className = 'badge bg-danger me-3';
+                    statusBadge.innerHTML = '<i class="bi bi-wifi-off"></i> Disconnected';
+                    connectionAlert.classList.add('show');
+                    document.querySelector('.loading-spinner').style.display = 'inline-block';
+                }
+            }
+
+            attemptReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    console.log(`Reconnection attempt ${this.reconnectAttempts}`);
+                    setTimeout(() => this.initializeWebSocket(), 3000 * this.reconnectAttempts);
+                }
+            }
+
+            handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'station_update':
+                        this.updateStation(data.station);
+                        break;
+                    case 'metrics_update':
+                        this.updateMetrics(data.metrics);
+                        break;
+                    case 'system_stats':
+                        this.updateSystemStats(data.stats);
+                        break;
+                    default:
+                        console.log('Unknown message type:', data.type);
+                }
+            }
+
+            async loadStations() {
+                try {
+                    const response = await fetch('/api/simulator/stations');
+                    const data = await response.json();
+                    this.renderStations(data.data || []);
+                } catch (error) {
+                    console.error('Error loading stations:', error);
+                    this.showToast('Error', 'Failed to load stations', 'danger');
+                }
+            }
+
+            renderStations(stations) {
+                const grid = document.getElementById('stations-grid');
+                
+                if (stations.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-broadcast" style="font-size: 3rem; color: #ccc;"></i>
+                            <p class="mt-3 text-muted">No stations found. Create your first station!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                grid.innerHTML = stations.map(station => `
+                    <div class="col-md-4 col-lg-3 mb-3">
+                        <div class="card station-card ${station.isOnline ? 'online' : 'offline'}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">${station.stationId}</h6>
+                                    <span class="badge ${station.isOnline ? 'bg-success' : 'bg-danger'}">
+                                        ${station.isOnline ? 'Online' : 'Offline'}
+                                    </span>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    <strong>OCPP:</strong> ${station.config?.ocppVersion || 'N/A'}<br>
+                                    <strong>Power:</strong> ${station.config?.maxPower || 0} kW<br>
+                                    <strong>Connectors:</strong> ${station.connectors?.length || 0}
+                                </p>
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-sm btn-outline-success" onclick="dashboard.controlStation('${station.stationId}', 'start')">
+                                        <i class="bi bi-play"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="dashboard.controlStation('${station.stationId}', 'stop')">
+                                        <i class="bi bi-stop"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="dashboard.controlStation('${station.stationId}', 'delete')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                this.updateSystemOverview(stations);
+            }
+
+            updateSystemOverview(stations) {
+                const totalStations = stations.length;
+                const onlineStations = stations.filter(s => s.isOnline).length;
+                const chargingSessions = stations.reduce((sum, s) => sum + (s.activeConnectors || 0), 0);
+                const totalPower = stations.reduce((sum, s) => sum + (s.currentPower || 0), 0);
+
+                document.getElementById('total-stations').textContent = totalStations;
+                document.getElementById('online-stations').textContent = onlineStations;
+                document.getElementById('charging-sessions').textContent = chargingSessions;
+                document.getElementById('total-power').textContent = `${totalPower.toFixed(1)} kW`;
+            }
+
+            async controlStation(stationId, action) {
+                try {
+                    let url, method = 'PUT';
+                    
+                    switch (action) {
+                        case 'start':
+                            url = `/api/simulator/stations/${stationId}/start`;
+                            break;
+                        case 'stop':
+                            url = `/api/simulator/stations/${stationId}/stop`;
+                            break;
+                        case 'delete':
+                            url = `/api/simulator/stations/${stationId}`;
+                            method = 'DELETE';
+                            break;
+                        default:
+                            throw new Error('Invalid action');
+                    }
+
+                    const response = await fetch(url, { method });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showToast('Success', `Station ${action}ed successfully`, 'success');
+                        this.loadStations();
+                    } else {
+                        throw new Error(data.error || 'Operation failed');
+                    }
+                } catch (error) {
+                    console.error(`Error ${action}ing station:`, error);
+                    this.showToast('Error', error.message, 'danger');
+                }
+            }
+
+            async createStation(formData) {
+                try {
+                    const response = await fetch('/api/simulator/stations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showToast('Success', 'Station created successfully', 'success');
+                        this.loadStations();
+                        document.getElementById('station-form').reset();
+                    } else {
+                        throw new Error(data.error || 'Failed to create station');
+                    }
+                } catch (error) {
+                    console.error('Error creating station:', error);
+                    this.showToast('Error', error.message, 'danger');
+                }
+            }
+
+            initializeChart() {
+                const ctx = document.getElementById('metrics-chart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Total Power (kW)',
+                            data: [],
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            tension: 0.1
+                        }, {
+                            label: 'Active Sessions',
+                            data: [],
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                            }
+                        }
+                    }
+                });
+            }
+
+            updateChart(power, sessions) {
+                const now = new Date().toLocaleTimeString();
+                
+                if (this.chart.data.labels.length > 20) {
+                    this.chart.data.labels.shift();
+                    this.chart.data.datasets[0].data.shift();
+                    this.chart.data.datasets[1].data.shift();
+                }
+                
+                this.chart.data.labels.push(now);
+                this.chart.data.datasets[0].data.push(power);
+                this.chart.data.datasets[1].data.push(sessions);
+                this.chart.update('none');
+            }
+
+            setupEventListeners() {
+                document.getElementById('station-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const formData = {
+                        stationId: document.getElementById('station-id').value,
+                        vendor: document.getElementById('vendor').value,
+                        model: 'SimulatorModel',
+                        ocppVersion: document.getElementById('ocpp-version').value,
+                        maxPower: parseInt(document.getElementById('max-power').value) * 1000,
+                        connectorCount: 2,
+                        autoStart: true
+                    };
+                    this.createStation(formData);
+                });
+            }
+
+            showToast(title, message, type = 'info') {
+                const toastHtml = `
+                    <div class="toast align-items-center text-bg-${type} border-0" role="alert">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                <strong>${title}:</strong> ${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                        </div>
+                    </div>
+                `;
+                
+                const toastContainer = document.getElementById('toast-container');
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                
+                const toastElement = toastContainer.lastElementChild;
+                const toast = new bootstrap.Toast(toastElement);
+                toast.show();
+                
+                toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+            }
+        }
+
+        // Global functions
+        let dashboard;
+
+        function refreshData() {
+            dashboard.loadStations();
+        }
+
+        async function startAllStations() {
+            try {
+                const response = await fetch('/api/simulator/stations/start-all', { method: 'PUT' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboard.showToast('Success', 'All stations started', 'success');
+                    dashboard.loadStations();
+                }
+            } catch (error) {
+                dashboard.showToast('Error', 'Failed to start all stations', 'danger');
+            }
+        }
+
+        async function stopAllStations() {
+            try {
+                const response = await fetch('/api/simulator/stations/stop-all', { method: 'PUT' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboard.showToast('Success', 'All stations stopped', 'warning');
+                    dashboard.loadStations();
+                }
+            } catch (error) {
+                dashboard.showToast('Error', 'Failed to stop all stations', 'danger');
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            dashboard = new EVSimulatorDashboard();
+        });
+    </script>
+</body>
+</html>

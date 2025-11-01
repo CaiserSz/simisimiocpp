@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -161,6 +163,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Static dashboard middleware
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/dashboard', express.static(path.join(__dirname, 'public')));
+
+// Dashboard root redirect
+app.get('/dashboard', (req, res) => {
+  res.redirect('/dashboard/');
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -273,8 +285,12 @@ const startServer = async () => {
     await DatabaseManager.createIndexes();
     
     // Initialize WebSocket server
-    logger.info('🌐 Initializing WebSocket server...');
-    WebSocketServer.initialize(httpServer);
+    logger.info('🌐 Initializing WebSocket Server');
+    const wsServer = new WebSocketServer();
+    wsServer.initialize(httpServer);
+    
+    // Start dashboard periodic updates
+    wsServer.startDashboardUpdates();
     
     // Start HTTP server
     const server = httpServer.listen(config.port, config.host, () => {
