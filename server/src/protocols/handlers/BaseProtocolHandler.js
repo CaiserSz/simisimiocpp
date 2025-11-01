@@ -69,4 +69,4 @@ class BaseProtocolHandler {
   }
 }
 
-module.exports = BaseProtocolHandler;
+export default BaseProtocolHandler;

@@ -1,6 +1,7 @@
-const BaseProtocolHandler = require('./BaseProtocolHandler');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../../utils/logger');
+import BaseProtocolHandler from './BaseProtocolHandler.js';
+import { v4 as uuidv4 } from 'uuid';
+import WebSocket from 'ws';
+import logger from '../../utils/logger.js';
 
 /**
  * OCPP 1.6J Protocol Handler
@@ -50,10 +51,64 @@ class OCPP16JHandler extends BaseProtocolHandler {
    */
   async initializeWebSocket(params) {
     return new Promise((resolve, reject) => {
-      // Implementation for WebSocket connection
-      // This should be implemented based on your WebSocket library
-      // and connection management strategy
-      // ...
+      try {
+        // WebSocket is already imported
+        const wsUrl = params.url || `ws://localhost:${params.port || 8080}/${params.stationId}`;
+        
+        logger.info(`Connecting to WebSocket: ${wsUrl}`);
+        
+        this.ws = new WebSocket(wsUrl, ['ocpp1.6']);
+        
+        this.ws.on('open', () => {
+          logger.info('WebSocket connection established');
+          this.setupMessageHandlers();
+          resolve();
+        });
+        
+        this.ws.on('error', (error) => {
+          logger.error('WebSocket error:', error);
+          reject(error);
+        });
+        
+        this.ws.on('close', (code, reason) => {
+          logger.info(`WebSocket connection closed: ${code} - ${reason}`);
+          this.connected = false;
+          this.emit('disconnected', { code, reason });
+        });
+        
+        // Set connection timeout
+        setTimeout(() => {
+          if (this.ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('WebSocket connection timeout'));
+          }
+        }, params.timeout || 10000);
+        
+      } catch (error) {
+        logger.error('Error initializing WebSocket:', error);
+        reject(error);
+      }
+    });
+  }
+  
+  /**
+   * Setup message handlers for WebSocket
+   * @private
+   */
+  setupMessageHandlers() {
+    if (!this.ws) return;
+    
+    this.ws.on('message', (data) => {
+      try {
+        logger.debug('Received WebSocket message:', data.toString());
+        this.handleMessage(data.toString());
+      } catch (error) {
+        logger.error('Error handling WebSocket message:', error);
+        this.emit('error', error);
+      }
+    });
+    
+    this.ws.on('pong', () => {
+      logger.debug('Received WebSocket pong');
     });
   }
 
@@ -238,4 +293,4 @@ class OCPP16JHandler extends BaseProtocolHandler {
   }
 }
 
-module.exports = OCPP16JHandler;
+export default OCPP16JHandler;

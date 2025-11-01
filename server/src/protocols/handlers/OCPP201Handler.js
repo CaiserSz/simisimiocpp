@@ -1,6 +1,7 @@
-const BaseProtocolHandler = require('./BaseProtocolHandler');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../../utils/logger');
+import BaseProtocolHandler from './BaseProtocolHandler.js';
+import { v4 as uuidv4 } from 'uuid';
+import WebSocket from 'ws';
+import logger from '../../utils/logger.js';
 
 /**
  * OCPP 2.0.1 Protocol Handler
@@ -65,6 +66,125 @@ class OCPP201Handler extends BaseProtocolHandler {
       this.connected = false;
       throw error;
     }
+  }
+
+  /**
+   * Initialize WebSocket connection with OCPP 2.0.1 subprotocol
+   * @private
+   */
+  async initializeWebSocket(params) {
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = params.url || `ws://localhost:${params.port || 8080}/${params.stationId}`;
+        const protocols = params.protocols || ['ocpp2.0.1'];
+        
+        logger.info(`Connecting to WebSocket: ${wsUrl} with protocols: ${protocols.join(', ')}`);
+        
+        this.ws = new WebSocket(wsUrl, protocols);
+        
+        this.ws.on('open', () => {
+          logger.info('OCPP 2.0.1 WebSocket connection established');
+          this.setupMessageHandlers();
+          resolve();
+        });
+        
+        this.ws.on('error', (error) => {
+          logger.error('OCPP 2.0.1 WebSocket error:', error);
+          reject(error);
+        });
+        
+        this.ws.on('close', (code, reason) => {
+          logger.info(`OCPP 2.0.1 WebSocket connection closed: ${code} - ${reason}`);
+          this.connected = false;
+          this.stopHeartbeat();
+          this.emit('disconnected', { code, reason });
+        });
+        
+        // Set connection timeout
+        setTimeout(() => {
+          if (this.ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('OCPP 2.0.1 WebSocket connection timeout'));
+          }
+        }, params.timeout || 10000);
+        
+      } catch (error) {
+        logger.error('Error initializing OCPP 2.0.1 WebSocket:', error);
+        reject(error);
+      }
+    });
+  }
+  
+  /**
+   * Setup message handlers for WebSocket
+   * @private
+   */
+  setupMessageHandlers() {
+    if (!this.ws) return;
+    
+    this.ws.on('message', (data) => {
+      try {
+        logger.debug('Received OCPP 2.0.1 WebSocket message:', data.toString());
+        this.handleMessage(data.toString());
+      } catch (error) {
+        logger.error('Error handling OCPP 2.0.1 WebSocket message:', error);
+        this.emit('error', error);
+      }
+    });
+    
+    this.ws.on('pong', () => {
+      logger.debug('Received OCPP 2.0.1 WebSocket pong');
+    });
+  }
+
+  /**
+   * Start heartbeat mechanism for OCPP 2.0.1
+   * @param {number} interval - Heartbeat interval in seconds
+   * @private
+   */
+  startHeartbeat(interval) {
+    this.stopHeartbeat();
+    
+    logger.info(`Starting OCPP 2.0.1 heartbeat with interval: ${interval}s`);
+    
+    this.heartbeatInterval = setInterval(async () => {
+      try {
+        await this.sendCommand('Heartbeat', {});
+        logger.debug('OCPP 2.0.1 Heartbeat sent successfully');
+      } catch (error) {
+        logger.error('OCPP 2.0.1 Heartbeat failed:', error);
+        this.emit('error', error);
+      }
+    }, interval * 1000);
+  }
+
+  /**
+   * Stop heartbeat mechanism
+   * @private
+   */
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      logger.debug('OCPP 2.0.1 Heartbeat stopped');
+    }
+  }
+
+  /**
+   * Disconnect from the charging station
+   * @returns {Promise<boolean>} Disconnection status
+   */
+  async disconnect() {
+    this.stopHeartbeat();
+    this.connected = false;
+    
+    // Close WebSocket connection if exists
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    
+    this.emit('disconnected');
+    return true;
   }
 
   /**
@@ -287,4 +407,4 @@ class OCPP201Handler extends BaseProtocolHandler {
   }
 }
 
-module.exports = OCPP201Handler;
+export default OCPP201Handler;

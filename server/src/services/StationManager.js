@@ -1,11 +1,13 @@
-const ProtocolFactory = require('../protocols/ProtocolFactory');
-const logger = require('../utils/logger');
+import { EventEmitter } from 'events';
+import ProtocolFactory from '../protocols/ProtocolFactory.js';
+import logger from '../utils/logger.js';
 
 /**
  * Manages multiple charging stations with different OCPP protocols
  */
-class StationManager {
+class StationManager extends EventEmitter {
   constructor() {
+    super();
     this.stations = new Map(); // stationId -> station instance
     this.stationHandlers = new Map(); // stationId -> protocol handler
   }
@@ -257,4 +259,4 @@ class StationManager {
 }
 
 // Export singleton instance
-module.exports = new StationManager();
+export default new StationManager();

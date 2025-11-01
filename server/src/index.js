@@ -2,16 +2,86 @@ import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { ocppService } from './services/ocpp.service.js';
 import logger from './utils/logger.js';
 import config from './config/config.js';
 
+// Import routes
+import stationRouter from './routes/station.routes.js';
+import authRouter from './routes/auth.routes.js';
+import apiRouter from './routes/api/index.js';
+
 // Create Express application
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      fontSrc: ["'self'", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS Configuration
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
+      process.env.ALLOWED_ORIGINS.split(',') : 
+      ['http://localhost:3000', 'http://localhost:3001'];
+    
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['X-Total-Count'],
+  maxAge: 86400, // 24 hours
+};
+
+app.use(cors(corsOptions));
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}, User-Agent: ${req.get('User-Agent')}`);
+    res.status(429).json({
+      error: 'Too many requests from this IP, please try again later.',
+      retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+    });
+  }
+});
+
+// Apply rate limiting to API routes only
+app.use('/api/', limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -22,59 +92,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
-app.get('/api/stations', (req, res) => {
-  try {
-    const stations = ocppService.getConnectedStations();
-    res.json(stations);
-  } catch (error) {
-    logger.error('Error fetching stations:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Mount API routes
+app.use('/api/stations', stationRouter);
+app.use('/api/auth', authRouter);
+app.use('/api', apiRouter);
 
-app.get('/api/stations/:id/status', (req, res) => {
-  try {
-    const status = ocppService.getStationStatus(req.params.id);
-    res.json({ status });
-  } catch (error) {
-    logger.error(`Error getting status for station ${req.params.id}:`, error);
-    res.status(404).json({ error: 'Station not found' });
-  }
-});
-
-app.post('/api/stations/:id/start', async (req, res) => {
-  try {
-    const { connectorId = 1, idTag = 'default' } = req.body;
-    const result = await ocppService.sendRemoteStartTransaction(
-      req.params.id,
-      connectorId,
-      idTag
-    );
-    res.json(result);
-  } catch (error) {
-    logger.error(`Error starting transaction on station ${req.params.id}:`, error);
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.post('/api/stations/:id/stop', async (req, res) => {
-  try {
-    const { transactionId } = req.body;
-    if (!transactionId) {
-      return res.status(400).json({ error: 'transactionId is required' });
-    }
-    
-    const result = await ocppService.sendRemoteStopTransaction(
-      req.params.id,
-      transactionId
-    );
-    res.json(result);
-  } catch (error) {
-    logger.error(`Error stopping transaction on station ${req.params.id}:`, error);
-    res.status(400).json({ error: error.message });
-  }
-});
+// Legacy API endpoints are now handled by the mounted routers above
 
 // Error handling middleware
 app.use((err, req, res, next) => {

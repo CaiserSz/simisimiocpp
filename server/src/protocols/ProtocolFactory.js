@@ -3,8 +3,8 @@
  * Handles creation of protocol-specific handlers
  */
 
-const OCPP16JHandler = require('./handlers/OCPP16JHandler');
-const OCPP201Handler = require('./handlers/OCPP201Handler');
+import OCPP16JHandler from './handlers/OCPP16JHandler.js';
+import OCPP201Handler from './handlers/OCPP201Handler.js';
 
 class ProtocolFactory {
   /**
@@ -36,4 +36,4 @@ class ProtocolFactory {
   }
 }
 
-module.exports = ProtocolFactory;
+export default ProtocolFactory;
