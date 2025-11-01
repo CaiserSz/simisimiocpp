@@ -1,0 +1,47 @@
+[
+  {
+    "id": "admin",
+    "username": "admin",
+    "email": "admin@simulator.local",
+    "password": "$2b$10$FFRvBppI3ZUtYFYCfb2YAOzqb6huBcG3arvYTt225WzTlj4cj8DVi",
+    "role": "admin",
+    "isActive": true,
+    "firstName": "System",
+    "lastName": "Administrator",
+    "permissions": [
+      "*"
+    ],
+    "createdAt": "2025-11-01T18:26:01.727Z"
+  },
+  {
+    "id": "operator",
+    "username": "operator",
+    "email": "operator@simulator.local",
+    "password": "$2b$10$AoyuYICWKaodZVj7qGwWoes.wqVXCVG1JRBvxZJYRUnUPXeqo9A5G",
+    "role": "operator",
+    "isActive": true,
+    "firstName": "Operator",
+    "lastName": "User",
+    "permissions": [
+      "stations:read",
+      "stations:write",
+      "transactions:read"
+    ],
+    "createdAt": "2025-11-01T18:26:01.842Z"
+  },
+  {
+    "id": "viewer",
+    "username": "viewer",
+    "email": "viewer@simulator.local",
+    "password": "$2b$10$kpYas6Tgf2qDzaKq3rwLH.zJ.ATMCy1GaBwLTC8qF7F99.NWhUdL6",
+    "role": "user",
+    "isActive": true,
+    "firstName": "Viewer",
+    "lastName": "User",
+    "permissions": [
+      "stations:read",
+      "transactions:read"
+    ],
+    "createdAt": "2025-11-01T18:26:01.949Z"
+  }
+]

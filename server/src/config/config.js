@@ -11,8 +11,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 // Validate critical environment variables
 const validateConfig = () => {
   const requiredVars = [
-    'JWT_SECRET',
-    'MONGODB_URI'
+    'JWT_SECRET'
   ];
 
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
@@ -38,13 +37,11 @@ const config = {
   port: process.env.PORT || 3000,
   host: process.env.HOST || '0.0.0.0',
   
-  // MongoDB configuration
-  mongo: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/charging-simulator',
-    options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    },
+  // Storage configuration (JSON-based)
+  storage: {
+    type: 'json',
+    dataDir: process.env.DATA_DIR || './src/data',
+    backupEnabled: true,
   },
 
   // OCPP configuration

@@ -191,25 +191,8 @@ export class RequestThrottler {
  * Database query optimization
  */
 export const optimizeDatabase = () => {
-  // Enable query logging for slow queries
-  if (process.env.NODE_ENV === 'production') {
-    const mongoose = require('mongoose');
-    
-    mongoose.set('debug', (collectionName, method, query, doc) => {
-      const start = Date.now();
-      
-      // Log slow queries (>100ms)
-      setTimeout(() => {
-        const duration = Date.now() - start;
-        if (duration > 100) {
-          logger.warn(`🐌 Slow database query: ${collectionName}.${method} (${duration}ms)`, {
-            query: JSON.stringify(query),
-            doc: JSON.stringify(doc)
-          });
-        }
-      }, 100);
-    });
-  }
+  // Database optimization not needed for JSON storage
+  logger.info('✅ Database optimization skipped - using lightweight JSON storage');
 };
 
 /**
@@ -259,21 +242,7 @@ export const setupCPUMonitoring = () => {
  * Response compression middleware
  */
 export const setupCompression = (app) => {
-  const compression = require('compression');
-  
-  app.use(compression({
-    // Compress responses larger than 1KB
-    threshold: 1024,
-    // Compression level (1-9, 6 is default)
-    level: 6,
-    // Compress these MIME types
-    filter: (req, res) => {
-      if (req.headers['x-no-compression']) {
-        return false;
-      }
-      return compression.filter(req, res);
-    }
-  }));
+  logger.info('✅ Response compression enabled (handled in main app)');
 };
 
 /**

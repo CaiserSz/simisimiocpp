@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import authRoutes from './auth.routes.js';
-import userRoutes from './user.routes.js';
+import authRoutes from '../auth.routes.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 const router = Router();
@@ -16,7 +15,6 @@ router.get('/health', (req, res) => {
 
 // API routes
 router.use('/auth', authRoutes);
-router.use('/users', authenticate, authorize('admin'), userRoutes);
 
 // 404 handler for API routes
 router.use((req, res) => {

@@ -154,34 +154,3 @@ export const optionalAuth = async (req, res, next) => {
     next(); // Continue anyway for optional auth
   }
 };
-
-/**
- * WebSocket authentication middleware
- */
-export const socketAuthenticate = (socket, next) => {
-  try {
-    const token = socket.handshake.auth?.token || 
-                 socket.handshake.query?.token ||
-                 (socket.handshake.headers.authorization || '').split(' ')[1];
-    
-    if (!token) {
-      return next(new Error('Authentication error: No token provided'));
-    }
-    
-    // Verify token
-    const decoded = jwt.verify(token, config.security.jwtSecret);
-    
-    // Attach user to socket for later use
-    socket.user = decoded;
-    
-    next();
-  } catch (error) {
-    logger.error('Socket authentication error:', error);
-    
-    if (error.name === 'TokenExpiredError') {
-      return next(new Error('Authentication error: Token expired'));
-    }
-    
-    return next(new Error('Authentication error: Invalid token'));
-  }
-};

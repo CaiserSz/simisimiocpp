@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
-import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -282,7 +281,7 @@ const startServer = async () => {
     const server = httpServer.listen(config.port, config.host, () => {
       logger.info(`✅ Server running on http://${config.host}:${config.port}`);
       logger.info(`🌍 Environment: ${config.env}`);
-      logger.info(`📊 Database: ${config.mongo.uri}`);
+      logger.info(`📊 Storage: ${config.storage.type.toUpperCase()} files`);
       logger.info('🎯 All systems operational!');
     });
 

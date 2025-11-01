@@ -37,7 +37,6 @@ class WebSocketServer {
 
     this.setupMiddleware();
     this.setupEventHandlers();
-    this.setupStationManagerIntegration();
     this.setupSimulatorIntegration();
 
     logger.info('🚀 WebSocket Server initialized');
