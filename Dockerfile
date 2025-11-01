@@ -9,7 +9,10 @@ COPY package*.json ./
 COPY client/package*.json ./client/
 COPY server/package*.json ./server/
 
-# Install dependencies
+# Install system dependencies
+RUN apk add --no-cache git python3 make g++
+
+# Install global npm packages
 RUN npm install -g concurrently
 
 # Install server dependencies
