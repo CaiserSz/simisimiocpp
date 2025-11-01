@@ -213,8 +213,10 @@ export const performanceMiddleware = (req, res, next) => {
       });
     }
 
-    // Add performance header
-    res.set('X-Response-Time', `${duration.toFixed(2)}ms`);
+    // Add performance header (only if headers haven't been sent)
+    if (!res.headersSent) {
+      res.set('X-Response-Time', `${duration.toFixed(2)}ms`);
+    }
   });
 
   next();
