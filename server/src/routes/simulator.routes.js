@@ -66,7 +66,7 @@ router.post('/stations',
     body('ocppVersion').isIn(['1.6J', '2.0.1']).withMessage('OCPP version must be 1.6J or 2.0.1'),
     body('connectorCount').optional().isInt({ min: 1, max: 10 }).withMessage('Connector count must be between 1 and 10'),
     body('maxPower').optional().isInt({ min: 1000 }).withMessage('Max power must be at least 1000W'),
-    body('csmsUrl').isURL().withMessage('CSMS URL must be a valid WebSocket URL'),
+    body('csmsUrl').matches(/^wss?:\/\/.+/).withMessage('CSMS URL must be a valid WebSocket URL (ws:// or wss://)'),
     body('heartbeatInterval').optional().isInt({ min: 60, max: 3600 }).withMessage('Heartbeat interval must be between 60 and 3600 seconds')
   ],
   simulatorController.createStation

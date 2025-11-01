@@ -147,6 +147,11 @@
                                 <input type="number" class="form-control" id="max-power" value="22" min="1" max="350">
                             </div>
                             <div class="col-12">
+                                <label class="form-label">CSMS URL</label>
+                                <input type="text" class="form-control" id="csms-url" value="ws://localhost:9221" placeholder="ws://localhost:9221" required>
+                                <small class="form-text text-muted">WebSocket URL of the CSMS (Central Station Management System)</small>
+                            </div>
+                            <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-play-circle"></i> Create & Start Station
                                 </button>
@@ -283,12 +288,29 @@
 
             async loadStations() {
                 try {
+                    // Hide loading spinner
+                    const loadingSpinner = document.querySelector('.loading-spinner');
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+
                     const response = await fetch('/api/simulator/stations');
                     const data = await response.json();
-                    this.renderStations(data.data || []);
+                    
+                    // Handle different API response formats
+                    let stations = [];
+                    if (data.data && data.data.stations) {
+                        // Convert stations object to array
+                        stations = Object.values(data.data.stations);
+                    } else if (Array.isArray(data.data)) {
+                        stations = data.data;
+                    }
+                    
+                    this.renderStations(stations);
                 } catch (error) {
                     console.error('Error loading stations:', error);
                     this.showToast('Error', 'Failed to load stations', 'danger');
+                    // Hide loading spinner on error too
+                    const loadingSpinner = document.querySelector('.loading-spinner');
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
                 }
             }
 
@@ -474,8 +496,9 @@
                         vendor: document.getElementById('vendor').value,
                         model: 'SimulatorModel',
                         ocppVersion: document.getElementById('ocpp-version').value,
-                        maxPower: parseInt(document.getElementById('max-power').value) * 1000,
+                        maxPower: parseInt(document.getElementById('max-power').value) * 1000, // Convert kW to W
                         connectorCount: 2,
+                        csmsUrl: document.getElementById('csms-url').value,
                         autoStart: true
                     };
                     this.createStation(formData);
