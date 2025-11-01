@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 
 # Create app directory
 WORKDIR /app
@@ -10,7 +10,6 @@ COPY client/package*.json ./client/
 COPY server/package*.json ./server/
 
 # Install dependencies
-RUN npm install -g npm@latest
 RUN npm install -g concurrently
 
 # Install server dependencies
