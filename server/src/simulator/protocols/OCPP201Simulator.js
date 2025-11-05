@@ -34,9 +34,8 @@ export class OCPP201Simulator extends BaseOCPPSimulator {
             'NetworkProfileConnectionRetryBackOffRandomRange': { value: '10' },
             'NetworkProfileConnectionRetryBackOffRepeatTimes': { value: '2' },
             'NetworkProfileConnectionRetryBackOffWaitMinimum': { value: '5' },
-
             // Heartbeat
-            'HeartbeatInterval': { value: config.heartbeatInterval?.toString() || '300' },
+            'HeartbeatInterval': { value: config.heartbeatInterval ? .toString() || '300' },
 
             // Authorization
             'AuthCtrlrEnabled': { value: 'true' },
