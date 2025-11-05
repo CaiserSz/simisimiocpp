@@ -104,12 +104,37 @@ class MetricsCollector {
       help: 'Total energy delivered in kWh'
     });
 
+    // WebSocket Messages
+    this.wsMessagesCounter = new prometheus.Counter({
+      name: 'websocket_messages_total',
+      help: 'Total WebSocket messages sent/received',
+      labelNames: ['type', 'direction'] // type: station_update, dashboard_update, etc.; direction: sent, received
+    });
+
+    // OCPP Message Latency
+    this.ocppMessageLatency = new prometheus.Histogram({
+      name: 'ocpp_message_latency_seconds',
+      help: 'OCPP message processing latency',
+      labelNames: ['message_type', 'protocol_version'],
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]
+    });
+
+    // Cache Metrics
+    this.cacheHitRate = new prometheus.Counter({
+      name: 'cache_operations_total',
+      help: 'Total cache operations',
+      labelNames: ['operation', 'cache_type', 'status'] // operation: get, set, del; cache_type: memory, redis; status: hit, miss
+    });
+
     // Register all metrics
     this.register.registerMetric(this.httpRequestDuration);
     this.register.registerMetric(this.httpRequestTotal);
     this.register.registerMetric(this.wsConnectionsGauge);
+    this.register.registerMetric(this.wsMessagesCounter);
     this.register.registerMetric(this.ocppStationsGauge);
     this.register.registerMetric(this.ocppMessagesCounter);
+    this.register.registerMetric(this.ocppMessageLatency);
+    this.register.registerMetric(this.cacheHitRate);
     this.register.registerMetric(this.dbOperationDuration);
     this.register.registerMetric(this.dbOperationCounter);
     this.register.registerMetric(this.authAttemptsCounter);
@@ -165,6 +190,30 @@ class MetricsCollector {
     path = path.replace(/\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '/:uuid'); // UUIDs
     
     return path;
+  }
+
+  /**
+   * Record WebSocket message
+   */
+  recordWSMessage(type, direction = 'sent') {
+    this.wsMessagesCounter.inc({ type, direction });
+  }
+
+  /**
+   * Record OCPP message latency
+   */
+  recordOCPPLatency(messageType, protocolVersion, latencySeconds) {
+    this.ocppMessageLatency.observe({
+      message_type: messageType,
+      protocol_version: protocolVersion
+    }, latencySeconds);
+  }
+
+  /**
+   * Record cache operation
+   */
+  recordCacheOperation(operation, cacheType, status) {
+    this.cacheHitRate.inc({ operation, cache_type: cacheType, status });
   }
 
   /**
@@ -282,11 +331,17 @@ class MetricsCollector {
           avgResponseTime: this.getMetricValue(metrics, 'http_request_duration_seconds', 'mean')
         },
         websocket: {
-          activeConnections: this.getMetricValue(metrics, 'websocket_connections_active')
+          activeConnections: this.getMetricValue(metrics, 'websocket_connections_active'),
+          messagesTotal: this.getMetricValue(metrics, 'websocket_messages_total')
         },
         ocpp: {
           totalStations: this.getMetricValue(metrics, 'ocpp_stations_total'),
-          messagesProcessed: this.getMetricValue(metrics, 'ocpp_messages_total')
+          messagesProcessed: this.getMetricValue(metrics, 'ocpp_messages_total'),
+          avgLatency: this.getMetricValue(metrics, 'ocpp_message_latency_seconds', 'mean')
+        },
+        cache: {
+          operationsTotal: this.getMetricValue(metrics, 'cache_operations_total'),
+          hitRate: this.calculateCacheHitRate(metrics)
         },
         database: {
           operationsTotal: this.getMetricValue(metrics, 'database_operations_total'),
@@ -306,6 +361,25 @@ class MetricsCollector {
       logger.error('Error getting metrics summary:', error);
       throw error;
     }
+  }
+
+  /**
+   * Calculate cache hit rate
+   */
+  calculateCacheHitRate(metrics) {
+    const cacheMetric = metrics.find(m => m.name === 'cache_operations_total');
+    if (!cacheMetric) return 0;
+
+    let hits = 0;
+    let misses = 0;
+
+    cacheMetric.values.forEach(v => {
+      if (v.labels.status === 'hit') hits += v.value;
+      if (v.labels.status === 'miss') misses += v.value;
+    });
+
+    const total = hits + misses;
+    return total > 0 ? (hits / total) * 100 : 0;
   }
 
   /**

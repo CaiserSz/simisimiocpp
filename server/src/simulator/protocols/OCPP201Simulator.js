@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../../utils/logger.js';
+import metricsCollector from '../../middleware/metrics.middleware.js';
 
 /**
  * OCPP 2.0.1 Station Simulator Client
@@ -235,6 +236,7 @@ export class OCPP201Simulator extends EventEmitter {
    * Handle CALL messages from CSMS
    */
   async handleCall(messageId, action, payload) {
+    const startTime = Date.now();
     logger.info(`📞 Received CALL: ${action} (${messageId})`);
 
     try {
@@ -294,6 +296,10 @@ export class OCPP201Simulator extends EventEmitter {
       // Send CALLRESULT
       await this.sendCallResult(messageId, response);
 
+      // Record latency
+      const latency = (Date.now() - startTime) / 1000;
+      metricsCollector.recordOCPPLatency(action, '2.0.1', latency);
+
       // Emit command event for station simulator
       this.emit('commandReceived', { action, payload, messageId, response });
 
@@ -312,6 +318,13 @@ export class OCPP201Simulator extends EventEmitter {
     const pendingRequest = this.pendingRequests.get(messageId);
     if (pendingRequest) {
       this.pendingRequests.delete(messageId);
+      
+      // Record latency if startTime is available
+      if (pendingRequest.startTime && pendingRequest.action) {
+        const latency = (Date.now() - pendingRequest.startTime) / 1000;
+        metricsCollector.recordOCPPLatency(pendingRequest.action, '2.0.1', latency);
+      }
+      
       pendingRequest.resolve(payload);
     } else {
       logger.warn(`No pending request found for message ${messageId}`);
@@ -346,14 +359,20 @@ export class OCPP201Simulator extends EventEmitter {
 
       const messageId = uuidv4();
       const message = [2, messageId, action, payload];
+      const startTime = Date.now();
 
       logger.debug(`📤 Sending OCPP 2.0.1 message: ${action}`, payload);
 
       try {
         this.ws.send(JSON.stringify(message));
 
-        // Store pending request
-        this.pendingRequests.set(messageId, { resolve, reject });
+        // Store pending request with start time for latency calculation
+        this.pendingRequests.set(messageId, { 
+          resolve, 
+          reject, 
+          startTime,
+          action 
+        });
 
         // Set timeout for response
         setTimeout(() => {

@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { socketAuthenticate } from '../middleware/auth.middleware.js';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
+import metricsCollector from '../middleware/metrics.middleware.js';
 // StationManager removed - using SimulationManager instead
 import { simulationManager } from '../controllers/simulator.controller.js';
 
@@ -458,6 +459,8 @@ class WebSocketServer {
             ...data,
             timestamp: data.timestamp || new Date().toISOString()
         });
+        // Record metrics
+        metricsCollector.recordWSMessage(event, 'sent');
     }
 
     /**
@@ -468,6 +471,8 @@ class WebSocketServer {
             ...data,
             timestamp: data.timestamp || new Date().toISOString()
         });
+        // Record metrics
+        metricsCollector.recordWSMessage(event, 'sent');
     }
 
     /**
@@ -478,6 +483,8 @@ class WebSocketServer {
             ...data,
             timestamp: data.timestamp || new Date().toISOString()
         });
+        // Record metrics
+        metricsCollector.recordWSMessage(event, 'sent');
     }
 
     /**

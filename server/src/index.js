@@ -264,9 +264,8 @@ app.get('/health/detailed', async(req, res) => {
     try {
         const dbHealth = await DatabaseManager.healthCheck();
         const wsServer = req.app.locals.wsServer;
-        const wsStats = wsServer && typeof wsServer.getStatistics === 'function' 
-            ? wsServer.getStatistics() 
-            : { error: 'WebSocket not initialized' };
+        const wsStats = wsServer && typeof wsServer.getStatistics === 'function' ?
+            wsServer.getStatistics() : { error: 'WebSocket not initialized' };
 
         const health = {
             status: 'healthy',

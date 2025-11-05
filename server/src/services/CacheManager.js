@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
+import metricsCollector from '../middleware/metrics.middleware.js';
 
 /**
  * Enterprise Cache Manager with Redis
@@ -122,6 +123,7 @@ class CacheManager {
                 expires: Date.now() + (ttlSeconds * 1000)
             });
             this.cacheStats.sets++;
+            metricsCollector.recordCacheOperation('set', 'memory', 'success');
             logger.debug(`Memory cache SET: ${key} (TTL: ${ttlSeconds}s)`);
             return true;
         }
@@ -131,6 +133,7 @@ class CacheManager {
             await this.redis.setex(key, ttlSeconds, serializedValue);
 
             this.cacheStats.sets++;
+            metricsCollector.recordCacheOperation('set', 'redis', 'success');
             logger.debug(`Redis cache SET: ${key} (TTL: ${ttlSeconds}s)`);
             return true;
         } catch (error) {
@@ -148,6 +151,7 @@ class CacheManager {
             const cached = this.memoryCache.get(key);
             if (cached && cached.expires > Date.now()) {
                 this.cacheStats.hits++;
+                metricsCollector.recordCacheOperation('get', 'memory', 'hit');
                 logger.debug(`Memory cache HIT: ${key}`);
                 return JSON.parse(cached.value);
             } else if (cached) {
@@ -155,6 +159,7 @@ class CacheManager {
                 this.memoryCache.delete(key);
             }
             this.cacheStats.misses++;
+            metricsCollector.recordCacheOperation('get', 'memory', 'miss');
             logger.debug(`Memory cache MISS: ${key}`);
             return null;
         }
@@ -164,11 +169,13 @@ class CacheManager {
 
             if (value === null) {
                 this.cacheStats.misses++;
+                metricsCollector.recordCacheOperation('get', 'redis', 'miss');
                 logger.debug(`Redis cache MISS: ${key}`);
                 return null;
             }
 
             this.cacheStats.hits++;
+            metricsCollector.recordCacheOperation('get', 'redis', 'hit');
             logger.debug(`Redis cache HIT: ${key}`);
             return JSON.parse(value);
         } catch (error) {
