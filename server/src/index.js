@@ -80,8 +80,7 @@ app.use(helmet({
 // CORS Configuration
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedOrigins = process.env.ALLOWED_ORIGINS ?
-            process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:9220'];
+        const allowedOrigins = config.cors.allowedOrigins;
 
         // Allow requests with no origin (like mobile apps, curl, Postman)
         if (!origin) return callback(null, true);
@@ -93,22 +92,22 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['X-Total-Count'],
-    maxAge: 86400, // 24 hours
+    credentials: config.cors.credentials,
+    methods: config.cors.methods,
+    allowedHeaders: config.cors.allowedHeaders,
+    exposedHeaders: config.cors.exposedHeaders,
+    maxAge: config.cors.maxAge,
 };
 
 app.use(cors(corsOptions));
 
 // Rate Limiting
 const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.max,
     message: {
         error: 'Too many requests from this IP, please try again later.',
-        retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+        retryAfter: Math.ceil(config.rateLimit.windowMs / 1000)
     },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -116,7 +115,7 @@ const limiter = rateLimit({
         logger.warn(`Rate limit exceeded for IP: ${req.ip}, User-Agent: ${req.get('User-Agent')}`);
         res.status(429).json({
             error: 'Too many requests from this IP, please try again later.',
-            retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+            retryAfter: Math.ceil(config.rateLimit.windowMs / 1000)
         });
     }
 });
@@ -198,7 +197,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version,
+        version: config.version || '1.0.0',
     });
 });
 
@@ -269,7 +268,7 @@ app.get('/health/detailed', async(req, res) => {
         const health = {
             status: 'healthy',
             timestamp: new Date().toISOString(),
-            version: process.env.npm_package_version,
+            version: config.version || '1.0.0',
             uptime: process.uptime(),
             environment: config.env,
             services: {

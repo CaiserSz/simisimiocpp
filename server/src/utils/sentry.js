@@ -1,13 +1,16 @@
 // Sentry error tracking integration
 // Install with: npm install @sentry/node
 
+import config from '../config/config.js';
+import logger from './logger.js';
+
 let Sentry = null;
 
 export const initializeSentry = () => {
-    const sentryDsn = process.env.SENTRY_DSN;
+    const sentryDsn = process.env.SENTRY_DSN || config.sentry.dsn;
 
     if (!sentryDsn) {
-        console.log('Sentry DSN not configured - error tracking disabled');
+        logger.debug('Sentry DSN not configured - error tracking disabled');
         return null;
     }
 
@@ -18,7 +21,7 @@ export const initializeSentry = () => {
 
             Sentry.init({
                 dsn: sentryDsn,
-                environment: process.env.NODE_ENV || 'development',
+                environment: config.sentry.environment,
                 tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
                 beforeSend(event, hint) {
                     // Filter out known operational errors
@@ -33,12 +36,12 @@ export const initializeSentry = () => {
                 ],
             });
 
-            console.log('✅ Sentry initialized');
+            logger.info('✅ Sentry initialized');
         }).catch((error) => {
-            console.warn('Sentry package not installed. Install with: npm install @sentry/node');
+            logger.warn('Sentry package not installed. Install with: npm install @sentry/node');
         });
     } catch (error) {
-        console.warn('Failed to initialize Sentry:', error.message);
+        logger.warn('Failed to initialize Sentry:', error.message);
     }
 };
 

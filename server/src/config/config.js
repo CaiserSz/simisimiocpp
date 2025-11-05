@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(
     import.meta.url);
@@ -91,7 +92,7 @@ const validateConfig = () => {
         // Log warnings
         if (warnings.length > 0) {
             warnings.forEach(warning => {
-                console.warn(`⚠️  Config Warning: ${warning}`);
+                logger.warn(`⚠️  Config Warning: ${warning}`);
             });
         }
 
@@ -111,6 +112,7 @@ const config = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000,
   host: process.env.HOST || '0.0.0.0',
+  version: process.env.npm_package_version || '1.0.0',
   
   // Storage configuration (JSON-based)
   storage: {
@@ -146,6 +148,30 @@ const config = {
 
   // Client configuration (dashboard URL)
   clientUrl: process.env.CLIENT_URL || 'http://localhost:9220',
+
+  // Rate limiting configuration
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  },
+
+  // CORS configuration
+  cors: {
+    allowedOrigins: process.env.ALLOWED_ORIGINS ? 
+      process.env.ALLOWED_ORIGINS.split(',') : 
+      ['http://localhost:3000', 'http://localhost:9220'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Total-Count'],
+    maxAge: 86400, // 24 hours
+  },
+
+  // Sentry configuration
+  sentry: {
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+  },
 
   // Redis configuration (optional - only needed if caching enabled)
   redis: {

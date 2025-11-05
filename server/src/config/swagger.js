@@ -1,5 +1,6 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import logger from '../utils/logger.js';
 
 const options = {
     definition: {
@@ -209,7 +210,7 @@ export const swaggerSetup = async(app) => {
             swaggerSpec = swaggerJsdoc(options);
         }
     } catch (error) {
-        console.warn('Swagger setup failed:', error.message);
+        logger.warn('Swagger setup failed:', error.message);
         return null;
     }
 
