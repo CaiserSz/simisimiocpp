@@ -3,10 +3,95 @@ import helmet from 'helmet';
 import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import logger from '../utils/logger.js';
+import config from '../config/config.js';
 
 /**
  * Enhanced Security Middleware for Production
  */
+
+/**
+ * CSRF Protection using Double-Submit Cookie Pattern
+ * Modern, secure CSRF protection that works with API and web apps
+ */
+export const csrfProtection = (req, res, next) => {
+    // Skip CSRF for GET, HEAD, OPTIONS requests (safe methods)
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return next();
+    }
+
+    // Skip CSRF if authentication is disabled (development only)
+    if (!config.security.enableAuth) {
+        if (process.env.NODE_ENV === 'production') {
+            logger.error('🚨 CSRF protection bypassed in production - this is a security risk!');
+        }
+        return next();
+    }
+
+    // Get CSRF token from cookie
+    const csrfTokenCookie = req.cookies['XSRF-TOKEN'];
+
+    // Get CSRF token from header (X-XSRF-TOKEN or X-CSRF-TOKEN)
+    const csrfTokenHeader = req.headers['x-xsrf-token'] || req.headers['x-csrf-token'];
+
+    // If no cookie token exists, generate and set one
+    if (!csrfTokenCookie) {
+        const token = crypto.randomBytes(32).toString('hex');
+        res.cookie('XSRF-TOKEN', token, {
+            httpOnly: false, // Must be accessible to JavaScript for header submission
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
+
+        // For first request, allow it (token will be set)
+        if (!csrfTokenHeader) {
+            return next();
+        }
+    }
+
+    // Validate CSRF token
+    if (!csrfTokenHeader || csrfTokenHeader !== csrfTokenCookie) {
+        logger.warn('🚨 CSRF token validation failed', {
+            ip: req.ip,
+            method: req.method,
+            url: req.originalUrl,
+            requestId: req.id || req.requestId,
+            hasCookie: !!csrfTokenCookie,
+            hasHeader: !!csrfTokenHeader
+        });
+
+        return res.status(403).json({
+            success: false,
+            error: 'CSRF token validation failed',
+            message: 'Invalid or missing CSRF token. Please refresh the page and try again.',
+            requestId: req.id || req.requestId
+        });
+    }
+
+    // Token is valid, continue
+    next();
+};
+
+/**
+ * Generate CSRF token endpoint
+ * Clients can call this to get a CSRF token
+ */
+export const generateCsrfToken = (req, res) => {
+    const token = crypto.randomBytes(32).toString('hex');
+
+    res.cookie('XSRF-TOKEN', token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.json({
+        success: true,
+        csrfToken: token,
+        message: 'CSRF token generated and set in cookie'
+    });
+};
 
 /**
  * Advanced rate limiting with different tiers
@@ -33,9 +118,9 @@ export const createRateLimiter = (options = {}) => {
         ...defaults,
         ...options,
         handler: (req, res) => {
-            const identifier = req.user ?.id ? `User ${req.user.id}` : `IP ${req.ip}`;
+            const identifier = req.user ? .id ? `User ${req.user.id}` : `IP ${req.ip}`;
             logger.warn(`Rate limit exceeded for ${identifier}`, {
-                userId: req.user ?.id,
+                userId: req.user ? .id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent'),
                 url: req.originalUrl,
@@ -245,7 +330,7 @@ export const validateApiKey = (req, res, next) => {
 
     // Here you would validate against your API key database
     // For now, we'll just check against environment variable
-    const validApiKeys = process.env.VALID_API_KEYS ?.split(',') || [];
+    const validApiKeys = process.env.VALID_API_KEYS ? .split(',') || [];
 
     if (!validApiKeys.includes(apiKey)) {
         logger.warn(`Invalid API key attempt from IP: ${req.ip}`);
@@ -339,7 +424,7 @@ export const logSecurityEvent = (event, req, additional = {}) => {
         url: req.originalUrl,
         method: req.method,
         timestamp: new Date().toISOString(),
-        userId: req.user ?.id,
+        userId: req.user ? .id,
         ...additional
     });
 };
@@ -448,29 +533,36 @@ export const bruteForceMiddleware = (req, res, next) => {
  * Complete security middleware setup
  */
 export const setupSecurity = (app) => {
-    logger.info('🔒 Setting up security middleware...');
-
-    // Basic security headers
-    app.use(securityHeaders);
-
-    // Request sanitization
-    app.use(sanitizeRequest);
-
-    // Request size limiting
-    app.use(requestSizeLimit('10mb'));
-
-    // Rate limiting for different routes
-    // Auth routes: IP-based (before authentication)
-    app.use('/api/auth', authRateLimit);
-
-    // Simulator routes: User-based with role-based limits
-    app.use('/api/simulator', simulatorRateLimit);
-
-    // General API routes: User-based (falls back to IP for anonymous)
-    app.use('/api', apiRateLimit);
-
-    // Brute force protection for auth routes
-    app.use('/api/auth', bruteForceMiddleware);
-
-    logger.info('✅ Security middleware configured');
+  logger.info('🔒 Setting up security middleware...');
+  
+  // Basic security headers
+  app.use(securityHeaders);
+  
+  // CSRF Protection endpoint (must be before CSRF middleware)
+  app.get('/api/csrf-token', generateCsrfToken);
+  
+  // CSRF Protection for state-changing operations
+  // Apply to all POST, PUT, DELETE, PATCH requests
+  app.use('/api', csrfProtection);
+  
+  // Request sanitization
+  app.use(sanitizeRequest);
+  
+  // Request size limiting
+  app.use(requestSizeLimit('10mb'));
+  
+  // Rate limiting for different routes
+  // Auth routes: IP-based (before authentication)
+  app.use('/api/auth', authRateLimit);
+  
+  // Simulator routes: User-based with role-based limits
+  app.use('/api/simulator', simulatorRateLimit);
+  
+  // General API routes: User-based (falls back to IP for anonymous)
+  app.use('/api', apiRateLimit);
+  
+  // Brute force protection for auth routes
+  app.use('/api/auth', bruteForceMiddleware);
+  
+  logger.info('✅ Security middleware configured (CSRF protection enabled)');
 };

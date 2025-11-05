@@ -1,5 +1,6 @@
 import compression from 'compression';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -142,6 +143,9 @@ app.use(express.json({
     }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parser (required for CSRF protection)
+app.use(cookieParser());
 
 // Setup request middleware (ID, timeout, logging, context)
 setupRequestMiddleware(app);
