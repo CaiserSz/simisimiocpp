@@ -25,9 +25,39 @@ const validateConfig = () => {
 
         // Validate CSMS_URL format (if provided)
         if (process.env.CSMS_URL) {
+            const csmsUrl = process.env.CSMS_URL.trim();
             const csmsUrlPattern = /^wss?:\/\/.+/;
-            if (!csmsUrlPattern.test(process.env.CSMS_URL)) {
+
+            if (!csmsUrlPattern.test(csmsUrl)) {
                 errors.push('CSMS_URL must be a valid WebSocket URL (ws:// or wss://)');
+            } else {
+                // Additional validation: check URL structure
+                try {
+                    const url = new URL(csmsUrl);
+
+                    // Validate protocol
+                    if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+                        errors.push('CSMS_URL must use ws:// or wss:// protocol');
+                    }
+
+                    // Validate hostname is present
+                    if (!url.hostname || url.hostname.length === 0) {
+                        errors.push('CSMS_URL must include a valid hostname');
+                    }
+
+                    // Warn about localhost in production
+                    if (process.env.NODE_ENV === 'production' &&
+                        (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
+                        warnings.push('CSMS_URL points to localhost in production - consider using production CSMS endpoint');
+                    }
+
+                    // Warn about non-secure WebSocket in production
+                    if (process.env.NODE_ENV === 'production' && url.protocol === 'ws:') {
+                        warnings.push('CSMS_URL uses unencrypted WebSocket (ws://) in production - consider using secure WebSocket (wss://)');
+                    }
+                } catch (urlError) {
+                    errors.push(`CSMS_URL is not a valid URL: ${urlError.message}`);
+                }
             }
         }
 
@@ -86,6 +116,107 @@ const validateConfig = () => {
             const saltRounds = parseInt(process.env.PASSWORD_SALT_ROUNDS);
             if (isNaN(saltRounds) || saltRounds < 10 || saltRounds > 20) {
                 warnings.push('PASSWORD_SALT_ROUNDS should be between 10 and 20 for optimal security');
+            }
+        }
+
+        // Validate DATA_DIR path
+        if (process.env.DATA_DIR) {
+            const dataDir = process.env.DATA_DIR;
+
+            // Check for directory traversal attempts
+            if (dataDir.includes('..')) {
+                errors.push('DATA_DIR cannot contain directory traversal sequences (..)');
+            }
+
+            // Check if path is absolute or relative
+            const resolvedPath = path.isAbsolute(dataDir) ? dataDir : path.resolve(__dirname, '../../../', dataDir);
+
+            try {
+                // Check if directory exists or can be created
+                if (!fs.existsSync(resolvedPath)) {
+                    // Try to create directory (this will fail if parent doesn't exist or no permissions)
+                    try {
+                        fs.mkdirSync(resolvedPath, { recursive: true });
+                        logger.info(`📁 Created DATA_DIR: ${resolvedPath}`);
+                    } catch (mkdirError) {
+                        errors.push(`DATA_DIR cannot be created: ${resolvedPath}. Error: ${mkdirError.message}`);
+                    }
+                } else {
+                    // Check if it's actually a directory
+                    const stats = fs.statSync(resolvedPath);
+                    if (!stats.isDirectory()) {
+                        errors.push(`DATA_DIR must be a directory: ${resolvedPath}`);
+                    } else {
+                        // Check write permissions
+                        try {
+                            fs.accessSync(resolvedPath, fs.constants.W_OK);
+                        } catch (permError) {
+                            errors.push(`DATA_DIR is not writable: ${resolvedPath}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                warnings.push(`DATA_DIR validation warning: ${error.message}`);
+            }
+        }
+
+        // Validate OCPP_PORT
+        if (process.env.OCPP_PORT) {
+            const ocppPort = parseInt(process.env.OCPP_PORT);
+            if (isNaN(ocppPort) || ocppPort < 1 || ocppPort > 65535) {
+                errors.push('OCPP_PORT must be a valid number between 1 and 65535');
+            }
+
+            // Warn if OCPP_PORT conflicts with PORT
+            if (process.env.PORT && parseInt(process.env.PORT) === ocppPort) {
+                warnings.push('OCPP_PORT should be different from PORT to avoid conflicts');
+            }
+        }
+
+        // Validate HOST
+        if (process.env.HOST) {
+            const host = process.env.HOST.trim();
+            // Basic host validation (IP address or hostname)
+            const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+            const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+
+            if (!ipPattern.test(host) && !hostnamePattern.test(host) && host !== '0.0.0.0' && host !== 'localhost') {
+                warnings.push(`HOST format may be invalid: ${host}. Use IP address or valid hostname`);
+            }
+        }
+
+        // Validate LOG_FILE path (if provided)
+        if (process.env.LOG_FILE) {
+            const logFile = process.env.LOG_FILE;
+
+            // Check for directory traversal
+            if (logFile.includes('..')) {
+                errors.push('LOG_FILE cannot contain directory traversal sequences (..)');
+            }
+
+            // Check if log directory exists or can be created
+            const logDir = path.dirname(logFile);
+            const resolvedLogDir = path.isAbsolute(logDir) ? logDir : path.resolve(__dirname, '../../../', logDir);
+
+            try {
+                if (!fs.existsSync(resolvedLogDir)) {
+                    try {
+                        fs.mkdirSync(resolvedLogDir, { recursive: true });
+                        logger.info(`📁 Created log directory: ${resolvedLogDir}`);
+                    } catch (mkdirError) {
+                        warnings.push(`LOG_FILE directory cannot be created: ${resolvedLogDir}. Error: ${mkdirError.message}`);
+                    }
+                }
+            } catch (error) {
+                warnings.push(`LOG_FILE validation warning: ${error.message}`);
+            }
+        }
+
+        // Validate CLIENT_URL format (if provided)
+        if (process.env.CLIENT_URL) {
+            const clientUrlPattern = /^https?:\/\/.+/;
+            if (!clientUrlPattern.test(process.env.CLIENT_URL)) {
+                warnings.push('CLIENT_URL should be a valid HTTP/HTTPS URL');
             }
         }
 
