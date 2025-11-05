@@ -533,36 +533,36 @@ export const bruteForceMiddleware = (req, res, next) => {
  * Complete security middleware setup
  */
 export const setupSecurity = (app) => {
-  logger.info('🔒 Setting up security middleware...');
-  
-  // Basic security headers
-  app.use(securityHeaders);
-  
-  // CSRF Protection endpoint (must be before CSRF middleware)
-  app.get('/api/csrf-token', generateCsrfToken);
-  
-  // CSRF Protection for state-changing operations
-  // Apply to all POST, PUT, DELETE, PATCH requests
-  app.use('/api', csrfProtection);
-  
-  // Request sanitization
-  app.use(sanitizeRequest);
-  
-  // Request size limiting
-  app.use(requestSizeLimit('10mb'));
-  
-  // Rate limiting for different routes
-  // Auth routes: IP-based (before authentication)
-  app.use('/api/auth', authRateLimit);
-  
-  // Simulator routes: User-based with role-based limits
-  app.use('/api/simulator', simulatorRateLimit);
-  
-  // General API routes: User-based (falls back to IP for anonymous)
-  app.use('/api', apiRateLimit);
-  
-  // Brute force protection for auth routes
-  app.use('/api/auth', bruteForceMiddleware);
-  
-  logger.info('✅ Security middleware configured (CSRF protection enabled)');
+    logger.info('🔒 Setting up security middleware...');
+
+    // Basic security headers
+    app.use(securityHeaders);
+
+    // CSRF Protection endpoint (must be before CSRF middleware)
+    app.get('/api/csrf-token', generateCsrfToken);
+
+    // CSRF Protection for state-changing operations
+    // Apply to all POST, PUT, DELETE, PATCH requests
+    app.use('/api', csrfProtection);
+
+    // Request sanitization
+    app.use(sanitizeRequest);
+
+    // Request size limiting
+    app.use(requestSizeLimit('10mb'));
+
+    // Rate limiting for different routes
+    // Auth routes: IP-based (before authentication)
+    app.use('/api/auth', authRateLimit);
+
+    // Simulator routes: User-based with role-based limits
+    app.use('/api/simulator', simulatorRateLimit);
+
+    // General API routes: User-based (falls back to IP for anonymous)
+    app.use('/api', apiRateLimit);
+
+    // Brute force protection for auth routes
+    app.use('/api/auth', bruteForceMiddleware);
+
+    logger.info('✅ Security middleware configured (CSRF protection enabled)');
 };

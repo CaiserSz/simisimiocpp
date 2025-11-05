@@ -1,6 +1,6 @@
 import compression from 'compression';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -11,10 +11,11 @@ import { fileURLToPath } from 'url';
 
 // Services and utilities
 import config from './config/config.js';
-import metricsCollector from './middleware/metrics.middleware.js';
-import { setupSecurity } from './middleware/security.middleware.js';
-import { setupRequestMiddleware } from './middleware/request.middleware.js';
 import { apiVersionMiddleware, setupApiVersioning } from './middleware/apiVersion.middleware.js';
+import { createCorsOptions } from './middleware/cors.middleware.js';
+import metricsCollector from './middleware/metrics.middleware.js';
+import { setupRequestMiddleware } from './middleware/request.middleware.js';
+import { setupSecurity } from './middleware/security.middleware.js';
 import WebSocketServer from './services/WebSocketServer.js';
 import DatabaseManager from './utils/database.js';
 import logger from './utils/logger.js';
