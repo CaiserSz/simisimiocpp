@@ -457,6 +457,35 @@ export class SimulationManager extends EventEmitter {
         station.on('csmsDisconnected', (data) => {
             this.emit('csmsDisconnected', data);
         });
+
+        station.on('csmsReconnecting', (data) => {
+            logger.info(`🔄 Station ${data.stationId} attempting to reconnect to CSMS (attempt ${data.attempt}/${data.maxAttempts})`);
+            this.emit('csmsReconnecting', data);
+        });
+
+        station.on('csmsReconnected', (data) => {
+            logger.info(`✅ Station ${data.stationId} successfully reconnected to CSMS`);
+            this.emit('csmsReconnected', data);
+        });
+
+        station.on('csmsConnectionFailed', (data) => {
+            logger.error(`❌ Station ${data.stationId} failed to reconnect to CSMS after ${data.attempts} attempts`);
+            this.emit('csmsConnectionFailed', data);
+
+            // Emit critical alert
+            this.emit('stationHealthAlert', {
+                stationId: data.stationId,
+                health: {
+                    status: 'critical',
+                    score: 0,
+                    issues: [{
+                        type: 'csms_connection_failed',
+                        message: 'Failed to reconnect to CSMS',
+                        severity: 'critical'
+                    }]
+                }
+            });
+        });
     }
 
     /**

@@ -31,6 +31,10 @@ export class BaseOCPPSimulator extends EventEmitter {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectInterval = 5000; // 5 seconds
+        this.reconnectTimer = null; // Store reconnect timer for cleanup
+        this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting, failed
+        this.lastConnectionError = null;
+        this.reconnectBackoffMultiplier = 1; // Exponential backoff multiplier
     }
 
     /**
@@ -87,15 +91,31 @@ export class BaseOCPPSimulator extends EventEmitter {
                 this.ws.on('open', async() => {
                     logger.info(`✅ OCPP ${protocolVersion} WebSocket connected: ${this.stationId}`);
                     this.isConnected = true;
+
+                    // Reset reconnect attempts on successful connection
+                    const wasReconnecting = this.reconnectAttempts > 0;
                     this.reconnectAttempts = 0;
+                    this.reconnectBackoffMultiplier = 1;
+                    this.connectionState = 'connected';
+                    this.lastConnectionError = null;
 
                     // Send boot notification
                     try {
                         await this.sendBootNotification();
                         this.emit('connected');
+
+                        // Emit reconnection success if this was a reconnection
+                        if (wasReconnecting) {
+                            this.emit('reconnectionSuccess', {
+                                stationId: this.stationId,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+
                         resolve();
                     } catch (error) {
                         logger.error('Boot notification failed:', error);
+                        this.connectionState = 'failed';
                         reject(error);
                     }
                 });
@@ -108,15 +128,34 @@ export class BaseOCPPSimulator extends EventEmitter {
                     const protocolVersion = this.getProtocolVersion();
                     logger.warn(`🔌 OCPP ${protocolVersion} WebSocket closed: ${code} - ${reason}`);
                     this.isConnected = false;
-                    this.emit('disconnected', { code, reason });
 
-                    // Attempt reconnection
-                    this.attemptReconnection();
+                    // Update connection state
+                    if (this.connectionState === 'connected') {
+                        this.connectionState = 'reconnecting';
+                    }
+
+                    this.emit('disconnected', {
+                        code,
+                        reason: reason.toString(),
+                        stationId: this.stationId,
+                        reconnectAttempts: this.reconnectAttempts,
+                        maxReconnectAttempts: this.maxReconnectAttempts
+                    });
+
+                    // Attempt reconnection if not manually disconnected
+                    if (this.connectionState !== 'disconnected') {
+                        this.attemptReconnection();
+                    }
                 });
 
                 this.ws.on('error', (error) => {
                     const protocolVersion = this.getProtocolVersion();
                     logger.error(`❌ OCPP ${protocolVersion} WebSocket error:`, error);
+                    this.lastConnectionError = {
+                        message: error.message,
+                        code: error.code,
+                        timestamp: new Date().toISOString()
+                    };
                     this.emit('error', error);
 
                     if (!this.isConnected) {
@@ -143,6 +182,17 @@ export class BaseOCPPSimulator extends EventEmitter {
      * Disconnect from CSMS
      */
     async disconnect() {
+        // Clear reconnect timer
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
+        // Reset reconnection state
+        this.connectionState = 'disconnected';
+        this.reconnectAttempts = 0;
+        this.reconnectBackoffMultiplier = 1;
+
         if (this.ws && this.isConnected) {
             this.ws.close();
             this.isConnected = false;
@@ -155,19 +205,62 @@ export class BaseOCPPSimulator extends EventEmitter {
     attemptReconnection() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             logger.error(`❌ Max reconnection attempts reached for ${this.stationId}`);
+            this.connectionState = 'failed';
+            this.emit('reconnectionFailed', {
+                stationId: this.stationId,
+                attempts: this.reconnectAttempts,
+                maxAttempts: this.maxReconnectAttempts,
+                lastError: this.lastConnectionError,
+                timestamp: new Date().toISOString()
+            });
             return;
         }
 
-        this.reconnectAttempts++;
-        logger.info(`🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} for ${this.stationId}`);
+        // Clear any existing reconnect timer
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
 
-        setTimeout(async() => {
+        this.reconnectAttempts++;
+        this.connectionState = 'reconnecting';
+
+        // Exponential backoff with jitter
+        const baseDelay = this.reconnectInterval * this.reconnectBackoffMultiplier;
+        const jitter = Math.random() * 1000; // 0-1 second jitter
+        const delay = baseDelay + jitter;
+
+        // Increase backoff multiplier for next attempt (max 32x)
+        this.reconnectBackoffMultiplier = Math.min(this.reconnectBackoffMultiplier * 2, 32);
+
+        logger.info(`🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} for ${this.stationId} (delay: ${Math.round(delay)}ms)`);
+
+        // Emit reconnection attempt event
+        this.emit('reconnectionAttempt', {
+            stationId: this.stationId,
+            attempt: this.reconnectAttempts,
+            maxAttempts: this.maxReconnectAttempts,
+            delay: Math.round(delay),
+            timestamp: new Date().toISOString()
+        });
+
+        this.reconnectTimer = setTimeout(async() => {
             try {
+                this.connectionState = 'connecting';
                 await this.connect();
             } catch (error) {
                 logger.error(`Reconnection attempt ${this.reconnectAttempts} failed:`, error);
+                this.lastConnectionError = {
+                    message: error.message,
+                    code: error.code,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Retry if not max attempts
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.attemptReconnection();
+                }
             }
-        }, this.reconnectInterval * this.reconnectAttempts); // Exponential backoff
+        }, delay);
     }
 
     /**

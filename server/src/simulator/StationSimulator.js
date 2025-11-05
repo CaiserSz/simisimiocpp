@@ -230,12 +230,87 @@ export class StationSimulator extends EventEmitter {
     setupOCPPEventHandlers() {
         this.ocppClient.on('connected', () => {
             logger.info(`🔗 OCPP client connected: ${this.stationId}`);
+            this.isOnline = true;
+            this.status = 'Available';
             this.emit('csmsConnected', { stationId: this.stationId });
+            this.updateHealthScore();
         });
 
-        this.ocppClient.on('disconnected', () => {
+        this.ocppClient.on('disconnected', (data) => {
             logger.warn(`🔌 OCPP client disconnected: ${this.stationId}`);
-            this.emit('csmsDisconnected', { stationId: this.stationId });
+            this.isOnline = false;
+            this.status = 'Unavailable';
+
+            // Record disconnection in history
+            this.recordError({
+                type: 'csms_disconnected',
+                message: `Disconnected from CSMS: ${data.reason || 'Unknown'}`,
+                severity: 'warning',
+                code: data.code,
+                reconnectAttempts: data.reconnectAttempts,
+                maxReconnectAttempts: data.maxReconnectAttempts
+            });
+
+            this.updateHealthScore();
+            this.emit('csmsDisconnected', { stationId: this.stationId, ...data });
+        });
+
+        this.ocppClient.on('reconnectionAttempt', (data) => {
+            logger.info(`🔄 Reconnection attempt ${data.attempt}/${data.maxAttempts} for ${this.stationId}`);
+
+            // Record reconnection attempt in history
+            this.recordError({
+                type: 'reconnection_attempt',
+                message: `Attempting to reconnect to CSMS (${data.attempt}/${data.maxAttempts})`,
+                severity: 'info',
+                attempt: data.attempt,
+                delay: data.delay
+            });
+
+            this.emit('csmsReconnecting', { stationId: this.stationId, ...data });
+        });
+
+        this.ocppClient.on('reconnectionSuccess', (data) => {
+            logger.info(`✅ Reconnection successful for ${this.stationId}`);
+            this.isOnline = true;
+            this.status = 'Available';
+
+            // Record successful reconnection
+            this.recordError({
+                type: 'reconnection_success',
+                message: 'Successfully reconnected to CSMS',
+                severity: 'info'
+            });
+
+            this.updateHealthScore();
+            this.emit('csmsReconnected', { stationId: this.stationId, ...data });
+        });
+
+        this.ocppClient.on('reconnectionFailed', (data) => {
+            logger.error(`❌ Reconnection failed for ${this.stationId} after ${data.attempts} attempts`);
+            this.isOnline = false;
+            this.status = 'Faulted';
+
+            // Record reconnection failure
+            this.recordError({
+                type: 'reconnection_failed',
+                message: `Failed to reconnect to CSMS after ${data.attempts} attempts`,
+                severity: 'critical',
+                attempts: data.attempts,
+                lastError: data.lastError
+            });
+
+            // Add critical health issue
+            this.health.issues.push({
+                type: 'csms_connection_failed',
+                message: 'Failed to reconnect to CSMS',
+                timestamp: new Date(),
+                severity: 'critical',
+                attempts: data.attempts
+            });
+
+            this.updateHealthScore();
+            this.emit('csmsConnectionFailed', { stationId: this.stationId, ...data });
         });
 
         this.ocppClient.on('commandReceived', (command) => {
@@ -254,6 +329,7 @@ export class StationSimulator extends EventEmitter {
                 stack: error.stack
             });
 
+            this.updateHealthScore();
             this.emit('ocppError', { stationId: this.stationId, error });
         });
     }
