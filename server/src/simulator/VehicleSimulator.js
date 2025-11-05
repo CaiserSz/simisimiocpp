@@ -98,10 +98,30 @@ export class VehicleSimulator {
    * Connect vehicle to charging station
    */
   async connectVehicle(connectorId, options = {}) {
+    // Input validation
+    if (!connectorId || connectorId < 1) {
+      throw new Error('Invalid connector ID');
+    }
+    
     const vehicleProfile = options.vehicleType || 'sedan';
-    const initialSoC = options.initialSoC || this.randomBetween(10, 60); // 10-60% initial charge
-    const targetSoC = options.targetSoC || this.randomBetween(80, 100); // 80-100% target charge
-
+    if (!this.vehicleProfiles[vehicleProfile]) {
+      throw new Error(`Invalid vehicle type: ${vehicleProfile}`);
+    }
+    
+    let initialSoC = options.initialSoC !== undefined ? options.initialSoC : this.randomBetween(10, 60);
+    let targetSoC = options.targetSoC !== undefined ? options.targetSoC : this.randomBetween(80, 100);
+    
+    // Validate SoC values
+    if (initialSoC < 0 || initialSoC > 100) {
+      throw new Error('Initial SoC must be between 0 and 100');
+    }
+    if (targetSoC < 0 || targetSoC > 100) {
+      throw new Error('Target SoC must be between 0 and 100');
+    }
+    if (initialSoC >= targetSoC) {
+      throw new Error('Target SoC must be greater than initial SoC');
+    }
+    
     const vehicle = {
       id: options.vehicleId || `EV_${uuidv4().substring(0, 8)}`,
       profile: this.vehicleProfiles[vehicleProfile],

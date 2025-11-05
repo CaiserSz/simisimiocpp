@@ -432,8 +432,8 @@ The system includes:
 ### Load Testing Results
 
 ```bash
-# Simulate 100 stations with k6
-k6 run --vus 100 --duration 5m performance-tests/load-test.js
+# Load testing example (requires k6 installation)
+# k6 run --vus 100 --duration 5m <your-load-test-script>
 ```
 
 ---

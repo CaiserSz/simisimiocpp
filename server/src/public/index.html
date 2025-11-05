@@ -205,6 +205,8 @@
     <script>
         class EVSimulatorDashboard {
             constructor() {
+                console.log('🚀 Initializing EV Simulator Dashboard...');
+                
                 this.ws = null;
                 this.stations = new Map();
                 this.metrics = { power: [], energy: [], sessions: [] };
@@ -216,6 +218,11 @@
                 this.initializeChart();
                 this.loadStations();
                 this.setupEventListeners();
+                
+                // Add test button for debugging
+                this.addDebugButton();
+                
+                console.log('✅ Dashboard initialization complete');
             }
 
             initializeWebSocket() {
@@ -495,8 +502,20 @@
             }
 
             setupEventListeners() {
-                document.getElementById('station-form').addEventListener('submit', (e) => {
+                console.log('🔧 Setting up event listeners...');
+                
+                const form = document.getElementById('station-form');
+                if (!form) {
+                    console.error('❌ Form not found: station-form');
+                    return;
+                }
+                
+                console.log('✅ Form found, adding submit listener');
+                
+                form.addEventListener('submit', (e) => {
+                    console.log('🚀 Form submitted!');
                     e.preventDefault();
+                    
                     const formData = {
                         stationId: document.getElementById('station-id').value,
                         vendor: document.getElementById('vendor').value,
@@ -507,8 +526,32 @@
                         csmsUrl: document.getElementById('csms-url').value,
                         autoStart: true
                     };
+                    
+                    console.log('📝 Form data prepared:', formData);
                     this.createStation(formData);
                 });
+                
+                console.log('✅ Event listeners setup complete');
+            }
+
+            addDebugButton() {
+                console.log('🔧 Adding debug button...');
+                
+                // Create a test station immediately for debugging
+                setTimeout(() => {
+                    console.log('🧪 Creating test station for debugging...');
+                    const testData = {
+                        stationId: 'DEBUG_STATION_001',
+                        vendor: 'DebugVendor',
+                        model: 'SimulatorModel',
+                        ocppVersion: '2.0.1',
+                        maxPower: 22000,
+                        connectorCount: 2,
+                        csmsUrl: 'ws://localhost:9221',
+                        autoStart: false
+                    };
+                    this.createStation(testData);
+                }, 2000);
             }
 
             showToast(title, message, type = 'info') {

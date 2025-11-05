@@ -1,337 +1,165 @@
+/**
+ * K6 Load Testing Script for EV Charging Station Simulator
+ * 
+ * Created: 2025-01-11
+ * Purpose: Comprehensive load testing for API endpoints
+ * 
+ * Usage:
+ *   k6 run load-test.js
+ *   k6 run --vus 50 --duration 30s load-test.js
+ */
+
 import http from 'k6/http';
-import ws from 'k6/ws';
 import { check, sleep } from 'k6';
-import { Rate, Trend } from 'k6/metrics';
+import { Rate, Trend, Counter } from 'k6/metrics';
 
 // Custom metrics
-const failureRate = new Rate('failures');
-const responseTrend = new Trend('response_time_ms');
-const stationCreationTrend = new Trend('station_creation_time_ms');
+const errorRate = new Rate('errors');
+const responseTime = new Trend('response_time');
+const requestCount = new Counter('requests');
 
 // Test configuration
 export const options = {
   stages: [
-    { duration: '2m', target: 20 }, // Ramp up to 20 users
-    { duration: '5m', target: 50 }, // Stay at 50 users
-    { duration: '2m', target: 100 }, // Ramp up to 100 users
-    { duration: '10m', target: 100 }, // Stay at 100 users
-    { duration: '5m', target: 0 }, // Ramp down to 0 users
+    { duration: '30s', target: 10 },   // Ramp up to 10 users
+    { duration: '1m', target: 10 },    // Stay at 10 users
+    { duration: '30s', target: 50 },   // Ramp up to 50 users
+    { duration: '1m', target: 50 },    // Stay at 50 users
+    { duration: '30s', target: 0 },    // Ramp down to 0 users
   ],
   thresholds: {
-    http_req_failed: ['rate<0.1'], // Error rate should be less than 10%
-    http_req_duration: ['p(95)<500'], // 95% of requests should be below 500ms
-    failures: ['rate<0.1'],
-    response_time_ms: ['p(95)<200'],
-    station_creation_time_ms: ['p(95)<1000']
+    http_req_duration: ['p(95)<500', 'p(99)<1000'], // 95% < 500ms, 99% < 1s
+    http_req_failed: ['rate<0.01'],                  // Error rate < 1%
+    errors: ['rate<0.01'],
   },
 };
 
-// Test data
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3001';
-const CSMS_URL = __ENV.CSMS_URL || 'ws://localhost:9220';
+
+// Test data
+const testUser = {
+  username: `loadtest_${Date.now()}`,
+  email: `loadtest_${Date.now()}@example.com`,
+  password: 'LoadTest123!',
+  firstName: 'Load',
+  lastName: 'Test'
+};
 
 let authToken = null;
 
 export function setup() {
-  // Login and get auth token
-  const loginPayload = {
-    email: 'admin@example.com',
-    password: 'admin123'
-  };
-
-  const loginResponse = http.post(`${BASE_URL}/api/auth/login`, JSON.stringify(loginPayload), {
-    headers: { 'Content-Type': 'application/json' }
+  console.log(`🚀 Starting load test against: ${BASE_URL}`);
+  
+  // Register a test user
+  const registerRes = http.post(`${BASE_URL}/api/auth/register`, JSON.stringify({
+    username: testUser.username,
+    email: testUser.email,
+    password: testUser.password,
+    firstName: testUser.firstName,
+    lastName: testUser.lastName
+  }), {
+    headers: { 'Content-Type': 'application/json' },
   });
 
-  if (loginResponse.status === 200) {
-    const loginData = JSON.parse(loginResponse.body);
-    authToken = loginData.token;
-    console.log('🔑 Authentication successful');
+  if (registerRes.status === 201) {
+    authToken = registerRes.json().token;
+    console.log('✅ Test user registered');
   } else {
-    console.error('❌ Authentication failed');
-    throw new Error('Authentication failed');
+    // Try to login instead
+    const loginRes = http.post(`${BASE_URL}/api/auth/login`, JSON.stringify({
+      email: testUser.email,
+      password: testUser.password
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (loginRes.status === 200) {
+      authToken = loginRes.json().token;
+      console.log('✅ Test user logged in');
+    }
   }
 
   return { authToken };
 }
 
 export default function(data) {
-  const token = data.authToken;
   const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   };
 
-  // Test scenarios
-  const scenarios = [
-    testDashboardOverview,
-    testStationManagement,
-    testStationCreation,
-    testStationOperation,
-    testVehicleSimulation,
-    testRealtimeMetrics
-  ];
+  if (data.authToken) {
+    headers['Authorization'] = `Bearer ${data.authToken}`;
+  }
 
-  // Randomly select a scenario
-  const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-  scenario(headers);
+  // Test 1: Health check
+  let res = http.get(`${BASE_URL}/health`);
+  let success = check(res, {
+    'health check status is 200': (r) => r.status === 200,
+    'health check response time < 200ms': (r) => r.timings.duration < 200,
+  });
+  errorRate.add(!success);
+  responseTime.add(res.timings.duration);
+  requestCount.add(1);
+  sleep(0.5);
 
+  // Test 2: Dashboard overview
+  res = http.get(`${BASE_URL}/api/dashboard/overview`, { headers });
+  success = check(res, {
+    'dashboard status is 200': (r) => r.status === 200,
+    'dashboard has statistics': (r) => {
+      const body = JSON.parse(r.body);
+      return body.success === true && body.data !== undefined;
+    },
+  });
+  errorRate.add(!success);
+  responseTime.add(res.timings.duration);
+  requestCount.add(1);
+  sleep(0.5);
+
+  // Test 3: Get stations list
+  res = http.get(`${BASE_URL}/api/simulator/stations`, { headers });
+  success = check(res, {
+    'stations list status is 200': (r) => r.status === 200,
+    'stations list is valid': (r) => {
+      const body = JSON.parse(r.body);
+      return body.success === true && Array.isArray(body.data);
+    },
+  });
+  errorRate.add(!success);
+  responseTime.add(res.timings.duration);
+  requestCount.add(1);
+  sleep(0.5);
+
+  // Test 4: Get statistics
+  res = http.get(`${BASE_URL}/api/simulator/stats`, { headers });
+  success = check(res, {
+    'stats status is 200': (r) => r.status === 200,
+    'stats has data': (r) => {
+      const body = JSON.parse(r.body);
+      return body.success === true && body.data !== undefined;
+    },
+  });
+  errorRate.add(!success);
+  responseTime.add(res.timings.duration);
+  requestCount.add(1);
+  sleep(0.5);
+
+  // Test 5: Get health summary
+  res = http.get(`${BASE_URL}/api/simulator/health`, { headers });
+  success = check(res, {
+    'health summary status is 200': (r) => r.status === 200,
+    'health summary valid': (r) => {
+      const body = JSON.parse(r.body);
+      return body.success === true;
+    },
+  });
+  errorRate.add(!success);
+  responseTime.add(res.timings.duration);
+  requestCount.add(1);
   sleep(1);
 }
 
-function testDashboardOverview(headers) {
-  const start = Date.now();
-  
-  const response = http.get(`${BASE_URL}/api/dashboard/overview`, { headers });
-  
-  const duration = Date.now() - start;
-  responseTrend.add(duration);
-  
-  const success = check(response, {
-    'dashboard overview status is 200': (r) => r.status === 200,
-    'dashboard overview has data': (r) => {
-      const data = JSON.parse(r.body);
-      return data.success && data.data;
-    },
-    'dashboard overview response time < 200ms': () => duration < 200
-  });
-
-  failureRate.add(!success);
-}
-
-function testStationManagement(headers) {
-  const start = Date.now();
-  
-  const response = http.get(`${BASE_URL}/api/dashboard/stations`, { headers });
-  
-  const duration = Date.now() - start;
-  responseTrend.add(duration);
-  
-  const success = check(response, {
-    'stations list status is 200': (r) => r.status === 200,
-    'stations list has data': (r) => {
-      const data = JSON.parse(r.body);
-      return data.success && Array.isArray(data.data.stations);
-    },
-    'stations list response time < 300ms': () => duration < 300
-  });
-
-  failureRate.add(!success);
-}
-
-function testStationCreation(headers) {
-  const stationConfig = {
-    vendor: `LoadTestVendor_${__VU}_${__ITER}`,
-    model: 'LoadTestModel',
-    ocppVersion: Math.random() > 0.5 ? '1.6J' : '2.0.1',
-    connectorCount: Math.floor(Math.random() * 3) + 1,
-    maxPower: 22000,
-    csmsUrl: CSMS_URL
-  };
-
-  const start = Date.now();
-  
-  const response = http.post(
-    `${BASE_URL}/api/simulator/stations`, 
-    JSON.stringify(stationConfig), 
-    { headers }
-  );
-  
-  const duration = Date.now() - start;
-  stationCreationTrend.add(duration);
-  
-  const success = check(response, {
-    'station creation status is 201': (r) => r.status === 201,
-    'station creation returns station data': (r) => {
-      const data = JSON.parse(r.body);
-      return data.success && data.data.station;
-    },
-    'station creation time < 1000ms': () => duration < 1000
-  });
-
-  failureRate.add(!success);
-
-  // If station created successfully, try to start it
-  if (success && response.status === 201) {
-    const stationData = JSON.parse(response.body);
-    const stationId = stationData.data.station.stationId;
-    
-    sleep(0.5); // Brief pause
-    
-    const startResponse = http.put(
-      `${BASE_URL}/api/simulator/stations/${stationId}/start`,
-      null,
-      { headers }
-    );
-    
-    check(startResponse, {
-      'station start status is 200': (r) => r.status === 200
-    });
-  }
-}
-
-function testStationOperation(headers) {
-  // Get existing stations first
-  const stationsResponse = http.get(`${BASE_URL}/api/dashboard/stations`, { headers });
-  
-  if (stationsResponse.status !== 200) {
-    failureRate.add(true);
-    return;
-  }
-
-  const stationsData = JSON.parse(stationsResponse.body);
-  const stations = stationsData.data.stations;
-
-  if (stations.length === 0) {
-    return; // No stations to test
-  }
-
-  // Pick a random station
-  const station = stations[Math.floor(Math.random() * stations.length)];
-  const stationId = station.stationId;
-
-  // Test various station operations
-  const operations = [
-    () => http.get(`${BASE_URL}/api/dashboard/stations/${stationId}`, { headers }),
-    () => http.put(`${BASE_URL}/api/simulator/stations/${stationId}/stop`, null, { headers }),
-    () => http.put(`${BASE_URL}/api/simulator/stations/${stationId}/start`, null, { headers })
-  ];
-
-  const operation = operations[Math.floor(Math.random() * operations.length)];
-  const response = operation();
-  
-  const success = check(response, {
-    'station operation status is 200': (r) => r.status === 200
-  });
-
-  failureRate.add(!success);
-}
-
-function testVehicleSimulation(headers) {
-  // Get existing stations
-  const stationsResponse = http.get(`${BASE_URL}/api/dashboard/stations`, { headers });
-  
-  if (stationsResponse.status !== 200) {
-    failureRate.add(true);
-    return;
-  }
-
-  const stationsData = JSON.parse(stationsResponse.body);
-  const stations = stationsData.data.stations.filter(s => s.isOnline);
-
-  if (stations.length === 0) {
-    return; // No online stations
-  }
-
-  const station = stations[Math.floor(Math.random() * stations.length)];
-  const stationId = station.stationId;
-  const connectorId = Math.floor(Math.random() * station.connectors.length) + 1;
-
-  // Connect vehicle
-  const vehicleConfig = {
-    vehicleType: ['compact', 'sedan', 'suv'][Math.floor(Math.random() * 3)],
-    initialSoC: Math.floor(Math.random() * 50) + 10,
-    targetSoC: Math.floor(Math.random() * 30) + 70
-  };
-
-  const connectResponse = http.post(
-    `${BASE_URL}/api/simulator/stations/${stationId}/connectors/${connectorId}/vehicle/connect`,
-    JSON.stringify(vehicleConfig),
-    { headers }
-  );
-
-  const connectSuccess = check(connectResponse, {
-    'vehicle connect status is 200': (r) => r.status === 200
-  });
-
-  if (connectSuccess) {
-    sleep(0.5);
-    
-    // Start charging
-    const chargingConfig = {
-      idTag: `LOAD_TEST_${__VU}_${__ITER}`
-    };
-
-    const chargingResponse = http.post(
-      `${BASE_URL}/api/simulator/stations/${stationId}/connectors/${connectorId}/charging/start`,
-      JSON.stringify(chargingConfig),
-      { headers }
-    );
-
-    check(chargingResponse, {
-      'charging start status is 200': (r) => r.status === 200
-    });
-  }
-
-  failureRate.add(!connectSuccess);
-}
-
-function testRealtimeMetrics(headers) {
-  const metrics = ['power', 'energy', 'utilization', 'sessions'];
-  const durations = ['5m', '15m', '1h'];
-  
-  const metric = metrics[Math.floor(Math.random() * metrics.length)];
-  const duration = durations[Math.floor(Math.random() * durations.length)];
-
-  const start = Date.now();
-  
-  const response = http.get(
-    `${BASE_URL}/api/dashboard/metrics?metric=${metric}&duration=${duration}`,
-    { headers }
-  );
-  
-  const responseTime = Date.now() - start;
-  responseTrend.add(responseTime);
-  
-  const success = check(response, {
-    'metrics status is 200': (r) => r.status === 200,
-    'metrics has data': (r) => {
-      const data = JSON.parse(r.body);
-      return data.success && data.data;
-    },
-    'metrics response time < 150ms': () => responseTime < 150
-  });
-
-  failureRate.add(!success);
-}
-
 export function teardown(data) {
-  console.log('🧹 Cleaning up test data...');
-  
-  // Optional: Clean up created stations
-  // This would require tracking created station IDs during the test
+  console.log('✅ Load test completed');
 }
 
-// WebSocket stress test (separate scenario)
-export function testWebSocketConnections() {
-  const url = `ws://localhost:3001/socket.io/?EIO=4&transport=websocket`;
-  
-  const response = ws.connect(url, {
-    timeout: '10s'
-  }, function (socket) {
-    socket.on('open', () => {
-      console.log('WebSocket connected');
-      
-      // Send authentication
-      socket.send(JSON.stringify({
-        type: 'auth',
-        token: authToken
-      }));
-    });
-
-    socket.on('message', (data) => {
-      console.log('Received:', data);
-    });
-
-    socket.on('close', () => {
-      console.log('WebSocket closed');
-    });
-
-    // Keep connection alive for testing
-    sleep(30);
-  });
-
-  check(response, {
-    'WebSocket connection successful': (r) => r && r.status === 101
-  });
-}

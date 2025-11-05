@@ -380,13 +380,68 @@ export const getSystemAlerts = asyncHandler(async (req, res) => {
 export const exportDashboardData = asyncHandler(async (req, res) => {
   const { format = 'json', timeRange = '24h' } = req.query;
   
-  const overview = await getDashboardOverview(req, { json: () => {} });
+  // Manually create overview data instead of calling controller function
+  // (Controller functions are Express handlers and cannot be called directly)
+  const statistics = simulationManager.getStatistics();
   const stationsStatus = simulationManager.getAllStationsStatus();
+  const stations = Object.values(stationsStatus);
+  
+  const totalConnectors = stations.reduce((sum, station) => sum + station.connectors.length, 0);
+  const activeConnectors = stations.reduce((sum, station) => 
+    sum + station.connectors.filter(c => c.status === 'Occupied').length, 0
+  );
+  const totalPower = stations.reduce((sum, station) => 
+    sum + station.connectors.reduce((connSum, conn) => connSum + (conn.currentPower || 0), 0), 0
+  );
+  const totalEnergyDelivered = stations.reduce((sum, station) => 
+    sum + station.connectors.reduce((connSum, conn) => connSum + (conn.energyDelivered || 0), 0), 0
+  );
+
+  const overview = {
+    timestamp: new Date().toISOString(),
+    simulation: {
+      isRunning: statistics.isRunning,
+      uptime: statistics.uptime,
+      startTime: statistics.startTime
+    },
+    stations: {
+      total: statistics.totalStations,
+      online: statistics.activeStations,
+      offline: statistics.totalStations - statistics.activeStations,
+      byProtocol: statistics.protocolDistribution,
+      byStatus: {
+        available: stations.filter(s => s.status === 'Available').length,
+        occupied: stations.filter(s => s.connectors.some(c => c.status === 'Occupied')).length,
+        faulted: stations.filter(s => s.status === 'Faulted').length,
+        unavailable: stations.filter(s => s.status === 'Unavailable').length
+      }
+    },
+    connectors: {
+      total: totalConnectors,
+      active: activeConnectors,
+      available: totalConnectors - activeConnectors,
+      utilizationRate: totalConnectors > 0 ? (activeConnectors / totalConnectors * 100).toFixed(1) : 0
+    },
+    power: {
+      totalActivePower: Math.round(totalPower / 1000 * 100) / 100,
+      averagePowerPerStation: statistics.activeStations > 0 ? 
+        Math.round(totalPower / statistics.activeStations / 1000 * 100) / 100 : 0,
+      peakPower: Math.max(...stations.map(s => 
+        s.connectors.reduce((sum, c) => sum + (c.currentPower || 0), 0)
+      )) / 1000 || 0
+    },
+    energy: {
+      totalDelivered: Math.round(totalEnergyDelivered * 100) / 100,
+      averagePerSession: statistics.totalSessions > 0 ? 
+        Math.round(totalEnergyDelivered / statistics.totalSessions * 100) / 100 : 0,
+      totalSessions: statistics.totalSessions
+    }
+  };
   
   const exportData = {
     generatedAt: new Date().toISOString(),
     timeRange,
-    overview: overview.data || {},
+    overview: overview,
     stations: Object.values(stationsStatus),
     statistics: simulationManager.getStatistics()
   };
@@ -409,18 +464,34 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
 
 /**
  * Helper function to convert data to CSV
+ * Includes CSV injection protection by escaping special characters
  */
 function convertToCSV(data) {
+  // CSV injection protection - escape special characters
+  const escapeCSV = (value) => {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    // Escape quotes and wrap in quotes if contains comma, newline, or quote
+    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    // Escape leading special characters that could be interpreted as formulas
+    if (/^[=+\-@]/.test(str)) {
+      return `"${str}"`;
+    }
+    return str;
+  };
+  
   const headers = ['Station ID', 'Status', 'Protocol', 'Power (kW)', 'Energy (kWh)', 'Utilization (%)'];
   const rows = data.stations.map(station => [
-    station.stationId,
-    station.status,
-    station.config.ocppVersion,
-    (station.connectors.reduce((sum, c) => sum + (c.currentPower || 0), 0) / 1000).toFixed(2),
-    station.connectors.reduce((sum, c) => sum + (c.energyDelivered || 0), 0).toFixed(2),
-    station.connectors.length > 0 ? 
-      (station.connectors.filter(c => c.hasActiveTransaction).length / station.connectors.length * 100).toFixed(1) : 0
+    escapeCSV(station.stationId),
+    escapeCSV(station.status),
+    escapeCSV(station.config.ocppVersion),
+    escapeCSV((station.connectors.reduce((sum, c) => sum + (c.currentPower || 0), 0) / 1000).toFixed(2)),
+    escapeCSV(station.connectors.reduce((sum, c) => sum + (c.energyDelivered || 0), 0).toFixed(2)),
+    escapeCSV(station.connectors.length > 0 ? 
+      (station.connectors.filter(c => c.hasActiveTransaction).length / station.connectors.length * 100).toFixed(1) : 0)
   ]);
   
-  return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  return [headers.map(escapeCSV).join(','), ...rows.map(row => row.join(','))].join('\n');
 }

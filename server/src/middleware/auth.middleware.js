@@ -15,7 +15,14 @@ export const authenticate = async (req, res, next) => {
   try {
     // Skip authentication if disabled (for simple simulator usage)
     if (!config.security.enableAuth) {
-      logger.debug('Authentication disabled - bypassing auth check');
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('🚨 SECURITY CRITICAL: Authentication disabled in production!');
+        return res.status(500).json({
+          success: false,
+          error: 'Authentication cannot be disabled in production. Please enable authentication.'
+        });
+      }
+      logger.warn('⚠️ Authentication disabled - development mode only');
       return next();
     }
 
@@ -174,9 +181,13 @@ export const socketAuthenticate = (socket, next) => {
   try {
     // Skip authentication if disabled
     if (!config.security.enableAuth) {
-      logger.debug('Authentication disabled - bypassing WebSocket auth check');
-      // Create a dummy user for compatibility
-      socket.user = { id: 'anonymous', username: 'anonymous', role: 'admin' };
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('🚨 SECURITY CRITICAL: Authentication disabled in production!');
+        return next(new Error('Authentication cannot be disabled in production'));
+      }
+      logger.warn('⚠️ Authentication disabled - development mode only');
+      // Create a dummy user with limited permissions for development
+      socket.user = { id: 'anonymous', username: 'anonymous', role: 'user' }; // Changed from 'admin' to 'user'
       return next();
     }
 

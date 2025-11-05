@@ -1,0 +1,573 @@
+{
+  "timestamp": "2025-11-05T21:54:05.998Z",
+  "metadata": {
+    "version": "1.0.0"
+  },
+  "stations": [
+    {
+      "stationId": "TEST_STATION_1",
+      "config": {
+        "vendor": "TestVendor",
+        "model": "TestModel",
+        "serialNumber": "SN1762379645995",
+        "firmwareVersion": "1.0.0",
+        "ocppVersion": "1.6J",
+        "csmsUrl": "ws://localhost:9220",
+        "connectorCount": 2,
+        "maxPower": 22000,
+        "supportedStandards": [
+          "IEC62196Type2"
+        ],
+        "autoStart": false,
+        "simulationSpeed": 1,
+        "heartbeatInterval": 300,
+        "stationId": "TEST_STATION_1",
+        "groupId": null,
+        "networkId": "network_primary",
+        "operator": null,
+        "location": null,
+        "networkConfig": {
+          "latency": {
+            "min": 10,
+            "max": 50
+          },
+          "packetLoss": 0.001,
+          "disconnectionRate": 0.0001,
+          "enabled": true
+        }
+      },
+      "status": {
+        "stationId": "TEST_STATION_1",
+        "status": "Initializing",
+        "isOnline": false,
+        "config": {
+          "vendor": "TestVendor",
+          "model": "TestModel",
+          "serialNumber": "SN1762379645995",
+          "firmwareVersion": "1.0.0",
+          "ocppVersion": "1.6J",
+          "csmsUrl": "ws://localhost:9220",
+          "connectorCount": 2,
+          "maxPower": 22000,
+          "supportedStandards": [
+            "IEC62196Type2"
+          ],
+          "autoStart": false,
+          "simulationSpeed": 1,
+          "heartbeatInterval": 300,
+          "stationId": "TEST_STATION_1",
+          "groupId": null,
+          "networkId": "network_primary",
+          "operator": null,
+          "location": null,
+          "networkConfig": {
+            "latency": {
+              "min": 10,
+              "max": 50
+            },
+            "packetLoss": 0.001,
+            "disconnectionRate": 0.0001,
+            "enabled": true
+          }
+        },
+        "connectors": [
+          {
+            "connectorId": 1,
+            "status": "Available",
+            "currentPower": 0,
+            "energyDelivered": 0,
+            "hasActiveTransaction": false
+          },
+          {
+            "connectorId": 2,
+            "status": "Available",
+            "currentPower": 0,
+            "energyDelivered": 0,
+            "hasActiveTransaction": false
+          }
+        ],
+        "health": {
+          "score": 100,
+          "status": "healthy",
+          "lastCheck": "2025-11-05T21:54:05.995Z",
+          "issues": []
+        }
+      },
+      "health": {
+        "score": 100,
+        "status": "healthy",
+        "lastCheck": "2025-11-05T21:54:05.995Z",
+        "issues": [],
+        "networkStats": null
+      },
+      "history": {
+        "sessions": [],
+        "errors": [],
+        "metrics": []
+      }
+    },
+    {
+      "stationId": "TEST_STATION_2",
+      "config": {
+        "vendor": "TestVendor2",
+        "model": "TestModel2",
+        "serialNumber": "SN1762379645997",
+        "firmwareVersion": "1.0.0",
+        "ocppVersion": "2.0.1",
+        "csmsUrl": "ws://localhost:9220",
+        "connectorCount": 2,
+        "maxPower": 22000,
+        "supportedStandards": [
+          "IEC62196Type2"
+        ],
+        "autoStart": false,
+        "simulationSpeed": 1,
+        "heartbeatInterval": 300,
+        "stationId": "TEST_STATION_2",
+        "groupId": null,
+        "networkId": "network_primary",
+        "operator": null,
+        "location": null,
+        "networkConfig": {
+          "latency": {
+            "min": 10,
+            "max": 50
+          },
+          "packetLoss": 0.001,
+          "disconnectionRate": 0.0001,
+          "enabled": true
+        }
+      },
+      "status": {
+        "stationId": "TEST_STATION_2",
+        "status": "Initializing",
+        "isOnline": false,
+        "config": {
+          "vendor": "TestVendor2",
+          "model": "TestModel2",
+          "serialNumber": "SN1762379645997",
+          "firmwareVersion": "1.0.0",
+          "ocppVersion": "2.0.1",
+          "csmsUrl": "ws://localhost:9220",
+          "connectorCount": 2,
+          "maxPower": 22000,
+          "supportedStandards": [
+            "IEC62196Type2"
+          ],
+          "autoStart": false,
+          "simulationSpeed": 1,
+          "heartbeatInterval": 300,
+          "stationId": "TEST_STATION_2",
+          "groupId": null,
+          "networkId": "network_primary",
+          "operator": null,
+          "location": null,
+          "networkConfig": {
+            "latency": {
+              "min": 10,
+              "max": 50
+            },
+            "packetLoss": 0.001,
+            "disconnectionRate": 0.0001,
+            "enabled": true
+          }
+        },
+        "connectors": [
+          {
+            "connectorId": 1,
+            "status": "Available",
+            "currentPower": 0,
+            "energyDelivered": 0,
+            "hasActiveTransaction": false
+          },
+          {
+            "connectorId": 2,
+            "status": "Available",
+            "currentPower": 0,
+            "energyDelivered": 0,
+            "hasActiveTransaction": false
+          }
+        ],
+        "health": {
+          "score": 100,
+          "status": "healthy",
+          "lastCheck": "2025-11-05T21:54:05.997Z",
+          "issues": []
+        }
+      },
+      "health": {
+        "score": 100,
+        "status": "healthy",
+        "lastCheck": "2025-11-05T21:54:05.997Z",
+        "issues": [],
+        "networkStats": null
+      },
+      "history": {
+        "sessions": [],
+        "errors": [],
+        "metrics": []
+      }
+    }
+  ],
+  "groups": {
+    "urban_istanbul": {
+      "name": "Istanbul Urban Network",
+      "type": "location",
+      "location": {
+        "city": "Istanbul",
+        "country": "Turkey",
+        "coordinates": {
+          "lat": 41.0082,
+          "lon": 28.9784
+        }
+      },
+      "operator": "UrbanCharge Operator",
+      "description": "Urban charging network in Istanbul",
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.991Z"
+    },
+    "highway_ankara": {
+      "name": "Ankara Highway Corridor",
+      "type": "location",
+      "location": {
+        "city": "Ankara",
+        "country": "Turkey",
+        "coordinates": {
+          "lat": 39.9334,
+          "lon": 32.8597
+        }
+      },
+      "operator": "Highway Operator",
+      "description": "Highway charging corridor",
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.991Z"
+    },
+    "operator_alpha": {
+      "name": "Alpha Operator Network",
+      "type": "operator",
+      "operator": "Alpha Charging Solutions",
+      "description": "Alpha operator charging network",
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.991Z"
+    },
+    "operator_beta": {
+      "name": "Beta Operator Network",
+      "type": "operator",
+      "operator": "Beta Energy Corp",
+      "description": "Beta operator charging network",
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.991Z"
+    }
+  },
+  "networks": {
+    "network_primary": {
+      "name": "Primary CSMS Network",
+      "csmsUrl": "ws://localhost:9220",
+      "description": "Primary CSMS connection",
+      "latency": {
+        "min": 10,
+        "max": 50
+      },
+      "packetLoss": 0.001,
+      "disconnectionRate": 0.0001,
+      "stationIds": [
+        "TEST_STATION_1",
+        "TEST_STATION_2"
+      ],
+      "createdAt": "2025-11-05T21:54:05.992Z"
+    },
+    "network_secondary": {
+      "name": "Secondary CSMS Network",
+      "csmsUrl": "ws://localhost:9221",
+      "description": "Secondary CSMS connection",
+      "latency": {
+        "min": 20,
+        "max": 100
+      },
+      "packetLoss": 0.002,
+      "disconnectionRate": 0.0002,
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.992Z"
+    },
+    "network_test": {
+      "name": "Test Network",
+      "csmsUrl": "ws://localhost:9220",
+      "description": "Test CSMS connection",
+      "latency": {
+        "min": 0,
+        "max": 10
+      },
+      "packetLoss": 0,
+      "disconnectionRate": 0,
+      "stationIds": [],
+      "createdAt": "2025-11-05T21:54:05.992Z"
+    }
+  },
+  "statistics": {
+    "totalStations": 2,
+    "activeStations": 0,
+    "totalSessions": 0,
+    "totalEnergyDelivered": 0,
+    "averageSessionDuration": 0,
+    "protocolDistribution": {
+      "OCPP 1.6J": 1,
+      "OCPP 2.0.1": 1
+    },
+    "byGroup": {},
+    "byNetwork": {
+      "network_primary": {
+        "total": 2,
+        "active": 0
+      }
+    },
+    "byLocation": {
+      "unknown": {
+        "total": 2,
+        "active": 0
+      }
+    },
+    "isRunning": false,
+    "startTime": null,
+    "uptime": 0
+  },
+  "scenarios": {
+    "urban_mixed": {
+      "name": "Urban Mixed Charging",
+      "description": "Mixed AC and DC charging in urban environment",
+      "duration": 3600,
+      "stations": [
+        {
+          "profileId": "urban_ac",
+          "count": 10,
+          "csmsUrl": "ws://localhost:9220"
+        },
+        {
+          "profileId": "urban_dc_fast",
+          "count": 3,
+          "csmsUrl": "ws://localhost:9220"
+        }
+      ],
+      "vehicleScenarios": [
+        {
+          "type": "quick_charge",
+          "probability": 0.4
+        },
+        {
+          "type": "full_charge",
+          "probability": 0.3
+        },
+        {
+          "type": "top_up",
+          "probability": 0.3
+        }
+      ],
+      "events": [
+        {
+          "time": 300,
+          "action": "peak_hour_start"
+        },
+        {
+          "time": 1800,
+          "action": "peak_hour_end"
+        }
+      ]
+    },
+    "highway_corridor": {
+      "name": "Highway Charging Corridor",
+      "description": "Ultra-fast charging along highway corridor",
+      "duration": 7200,
+      "stations": [
+        {
+          "profileId": "highway_ultra_fast",
+          "count": 5,
+          "csmsUrl": "ws://localhost:9220"
+        }
+      ],
+      "vehicleScenarios": [
+        {
+          "type": "highway_stop",
+          "probability": 0.8
+        },
+        {
+          "type": "emergency_charge",
+          "probability": 0.2
+        }
+      ],
+      "events": [
+        {
+          "time": 900,
+          "action": "traffic_surge"
+        },
+        {
+          "time": 5400,
+          "action": "maintenance_mode"
+        }
+      ]
+    },
+    "workplace_daily": {
+      "name": "Workplace Daily Charging",
+      "description": "Daily workplace charging pattern",
+      "duration": 28800,
+      "stations": [
+        {
+          "profileId": "workplace_ac",
+          "count": 20,
+          "csmsUrl": "ws://localhost:9220"
+        }
+      ],
+      "vehicleScenarios": [
+        {
+          "type": "work_day_charge",
+          "probability": 0.9
+        },
+        {
+          "type": "visitor_charge",
+          "probability": 0.1
+        }
+      ],
+      "events": [
+        {
+          "time": 0,
+          "action": "morning_arrival"
+        },
+        {
+          "time": 14400,
+          "action": "lunch_break"
+        },
+        {
+          "time": 25200,
+          "action": "evening_departure"
+        }
+      ]
+    },
+    "load_test": {
+      "name": "Load Testing Scenario",
+      "description": "High-load testing with many concurrent stations",
+      "duration": 1800,
+      "stations": [
+        {
+          "profileId": "urban_ac",
+          "count": 50,
+          "csmsUrl": "ws://localhost:9220"
+        },
+        {
+          "profileId": "urban_dc_fast",
+          "count": 20,
+          "csmsUrl": "ws://localhost:9220"
+        },
+        {
+          "profileId": "highway_ultra_fast",
+          "count": 10,
+          "csmsUrl": "ws://localhost:9220"
+        }
+      ],
+      "vehicleScenarios": [
+        {
+          "type": "stress_test",
+          "probability": 1
+        }
+      ],
+      "events": [
+        {
+          "time": 300,
+          "action": "concurrent_start"
+        },
+        {
+          "time": 900,
+          "action": "protocol_switch"
+        },
+        {
+          "time": 1200,
+          "action": "error_simulation"
+        }
+      ]
+    }
+  },
+  "profiles": {
+    "urban_ac": {
+      "name": "Urban AC Charger",
+      "vendor": "UrbanCharge",
+      "model": "UC-AC-7",
+      "connectorCount": 2,
+      "maxPower": 7400,
+      "ocppVersion": "1.6J",
+      "heartbeatInterval": 300,
+      "supportedStandards": [
+        "IEC62196Type2"
+      ],
+      "location": "urban",
+      "description": "Standard urban AC charging station"
+    },
+    "urban_dc_fast": {
+      "name": "Urban DC Fast Charger",
+      "vendor": "FastCharge Co",
+      "model": "FC-DC-50",
+      "connectorCount": 1,
+      "maxPower": 50000,
+      "ocppVersion": "2.0.1",
+      "heartbeatInterval": 180,
+      "supportedStandards": [
+        "CCS",
+        "CHAdeMO"
+      ],
+      "location": "urban",
+      "description": "Urban DC fast charging station"
+    },
+    "highway_ultra_fast": {
+      "name": "Highway Ultra Fast Charger",
+      "vendor": "UltraFast Systems",
+      "model": "UFS-350",
+      "connectorCount": 4,
+      "maxPower": 350000,
+      "ocppVersion": "2.0.1",
+      "heartbeatInterval": 120,
+      "supportedStandards": [
+        "CCS2"
+      ],
+      "location": "highway",
+      "description": "Highway ultra-fast charging hub"
+    },
+    "workplace_ac": {
+      "name": "Workplace AC Charger",
+      "vendor": "WorkCharge",
+      "model": "WC-AC-11",
+      "connectorCount": 2,
+      "maxPower": 11000,
+      "ocppVersion": "1.6J",
+      "heartbeatInterval": 600,
+      "supportedStandards": [
+        "IEC62196Type2"
+      ],
+      "location": "workplace",
+      "description": "Workplace AC charging station"
+    },
+    "home_wallbox": {
+      "name": "Home Wallbox",
+      "vendor": "HomeCharge",
+      "model": "HC-Wall-22",
+      "connectorCount": 1,
+      "maxPower": 22000,
+      "ocppVersion": "1.6J",
+      "heartbeatInterval": 900,
+      "supportedStandards": [
+        "IEC62196Type2"
+      ],
+      "location": "residential",
+      "description": "Residential wallbox charger"
+    },
+    "destination_ac": {
+      "name": "Destination AC Charger",
+      "vendor": "DestinationCharge",
+      "model": "DC-AC-22",
+      "connectorCount": 2,
+      "maxPower": 22000,
+      "ocppVersion": "2.0.1",
+      "heartbeatInterval": 300,
+      "supportedStandards": [
+        "IEC62196Type2"
+      ],
+      "location": "destination",
+      "description": "Hotel/shopping center AC charger"
+    }
+  }
+}

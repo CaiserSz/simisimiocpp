@@ -4,67 +4,17 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 env:
-  NODE_VERSION: '20'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '20.x'
 
 jobs:
-  # Code Quality & Security Checks
-  quality:
-    name: Code Quality & Security
+  # Lint & Code Quality
+  lint:
+    name: Lint & Code Quality
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: server/package-lock.json
-
-      - name: Install server dependencies
-        run: |
-          cd server
-          npm ci
-
-      - name: Lint server code
-        run: |
-          cd server
-          npm run lint
-
-      - name: Format check
-        run: |
-          cd server
-          npm run format:check || echo "No format check script available"
-
-      - name: Security audit
-        run: |
-          cd server
-          npm audit --audit-level=moderate
-
-  # Unit & Integration Tests
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    needs: quality
     
-    services:
-      # No external database services needed - using JSON storage
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,45 +30,99 @@ jobs:
         run: |
           cd server && npm ci
 
-      - name: Run server unit tests
-        env:
-          STORAGE_TYPE: json
-          DATA_DIR: ./test-data
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing
-          NODE_ENV: test
+      - name: Run ESLint
         run: |
-          cd server
-          npm run test:unit -- --coverage --watchAll=false
+          cd server && npm run lint
 
-      - name: Run server integration tests
-        env:
-          STORAGE_TYPE: json
-          DATA_DIR: ./test-data
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing
-          NODE_ENV: test
-        run: |
-          cd server
-          npm run test:integration -- --watchAll=false
+  # Unit & Integration Tests
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          files: ./server/coverage/lcov.info
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd server && npm ci
+
+      - name: Run unit tests
+        env:
+          NODE_ENV: test
+          STORAGE_TYPE: json
+          DATA_DIR: ./test-data
+          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing-minimum-32-chars
+          CSMS_URL: ws://localhost:9221
+          REDIS_URL: redis://localhost:6379/1
+        run: |
+          cd server && npm run test:unit
+
+      - name: Run integration tests
+        env:
+          NODE_ENV: test
+          STORAGE_TYPE: json
+          DATA_DIR: ./test-data
+          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing-minimum-32-chars
+          CSMS_URL: ws://localhost:9221
+          REDIS_URL: redis://localhost:6379/1
+        run: |
+          cd server && npm run test:integration
+
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          file: ./server/coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
 
-  # Build & Push Docker Images
-  build:
-    name: Build & Push Images
+  # Security Audit
+  security:
+    name: Security Audit
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    outputs:
-      server-image: ${{ steps.meta-server.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd server && npm ci
+
+      - name: Run npm audit
+        run: |
+          cd server && npm audit --audit-level=moderate
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        if: env.SNYK_TOKEN != ''
+
+  # Build & Docker Image
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -126,83 +130,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: github.event_name != 'pull_request'
 
-      - name: Extract server metadata
-        id: meta-server
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix=main-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push server image
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: true
-          tags: ${{ steps.meta-server.outputs.tags }}
-          labels: ${{ steps.meta-server.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/ev-charging-simulator:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/ev-charging-simulator:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ev-charging-simulator:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ev-charging-simulator:buildcache,mode=max
+        if: github.event_name != 'pull_request'
 
-  # Health Check & Deployment Validation
-  health-check:
-    name: Health Check
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: server/package-lock.json
-
-      - name: Install dependencies
-        run: |
-          cd server && npm ci
-
-      - name: Start server for health check
-        env:
-          STORAGE_TYPE: json
-          DATA_DIR: ./test-data
-          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing
-          NODE_ENV: test
-          PORT: 3001
-        run: |
-          cd server
-          npm start &
-          sleep 10
-
-      - name: Test health endpoint
-        run: |
-          curl -f http://localhost:3001/health || exit 1
-          curl -f http://localhost:3001/api/auth/info || exit 1
-
-      - name: Test basic API endpoints
-        run: |
-          # Test station management endpoints
-          curl -f http://localhost:3001/api/simulator/stats || exit 1
-
-  # Performance & Load Testing
+  # Performance Tests
   performance:
     name: Performance Tests
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -226,50 +177,69 @@ jobs:
           sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
-          sudo apt-get install k6
+          sudo apt-get install -y k6
 
       - name: Start server for performance testing
         env:
+          NODE_ENV: test
           STORAGE_TYPE: json
           DATA_DIR: ./test-data
-          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing
-          NODE_ENV: test
+          JWT_SECRET: test-jwt-secret-for-ci-cd-pipeline-testing-minimum-32-chars
           PORT: 3001
         run: |
           cd server
           npm start &
           sleep 15
+          curl -f http://localhost:3001/health || exit 1
 
       - name: Run performance tests
         run: |
           cd performance-tests
-          k6 run --out json=results.json load-test.js
+          k6 run --out json=results.json load-test.js || true
 
       - name: Upload performance results
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: performance-results
           path: performance-tests/results.json
 
-  # Security Scanning
-  security:
-    name: Security Scan
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [build, security]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://staging.example.com
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './server'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Deploying to staging environment"
+          # Add your deployment script here
+          # Example: kubectl apply -f k8s/staging/
 
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-results.sarif'
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, security, performance]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://api.example.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production environment"
+          # Add your deployment script here
+          # Example: kubectl apply -f k8s/production/

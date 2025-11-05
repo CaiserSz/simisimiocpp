@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { body, param, query } from 'express-validator';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { body, param } from 'express-validator';
 import * as simulatorController from '../controllers/simulator.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -49,9 +49,9 @@ router.get('/stations', simulatorController.getStations);
  * @desc    Get specific station
  * @access  Private (Admin/Operator)
  */
-router.get('/stations/:stationId', 
-  param('stationId').notEmpty().withMessage('Station ID is required'),
-  simulatorController.getStation
+router.get('/stations/:stationId',
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.getStation
 );
 
 /**
@@ -59,17 +59,16 @@ router.get('/stations/:stationId',
  * @desc    Create new station
  * @access  Private (Admin/Operator)
  */
-router.post('/stations',
-  [
-    body('vendor').optional().isString().withMessage('Vendor must be a string'),
-    body('model').optional().isString().withMessage('Model must be a string'),
-    body('ocppVersion').isIn(['1.6J', '2.0.1']).withMessage('OCPP version must be 1.6J or 2.0.1'),
-    body('connectorCount').optional().isInt({ min: 1, max: 10 }).withMessage('Connector count must be between 1 and 10'),
-    body('maxPower').optional().isInt({ min: 1000 }).withMessage('Max power must be at least 1000W'),
-    body('csmsUrl').matches(/^wss?:\/\/.+/).withMessage('CSMS URL must be a valid WebSocket URL (ws:// or wss://)'),
-    body('heartbeatInterval').optional().isInt({ min: 60, max: 3600 }).withMessage('Heartbeat interval must be between 60 and 3600 seconds')
-  ],
-  simulatorController.createStation
+router.post('/stations', [
+        body('vendor').optional().isString().withMessage('Vendor must be a string'),
+        body('model').optional().isString().withMessage('Model must be a string'),
+        body('ocppVersion').isIn(['1.6J', '2.0.1']).withMessage('OCPP version must be 1.6J or 2.0.1'),
+        body('connectorCount').optional().isInt({ min: 1, max: 10 }).withMessage('Connector count must be between 1 and 10'),
+        body('maxPower').optional().isInt({ min: 1000 }).withMessage('Max power must be at least 1000W'),
+        body('csmsUrl').matches(/^wss?:\/\/.+/).withMessage('CSMS URL must be a valid WebSocket URL (ws:// or wss://)'),
+        body('heartbeatInterval').optional().isInt({ min: 60, max: 3600 }).withMessage('Heartbeat interval must be between 60 and 3600 seconds')
+    ],
+    simulatorController.createStation
 );
 
 /**
@@ -77,14 +76,13 @@ router.post('/stations',
  * @desc    Create stations from profile
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/from-profile',
-  [
-    body('profileId').notEmpty().withMessage('Profile ID is required'),
-    body('count').isInt({ min: 1, max: 100 }).withMessage('Count must be between 1 and 100'),
-    body('options.csmsUrl').optional().isURL().withMessage('CSMS URL must be valid'),
-    body('options.autoStart').optional().isBoolean().withMessage('Auto start must be boolean')
-  ],
-  simulatorController.createStationsFromProfile
+router.post('/stations/from-profile', [
+        body('profileId').notEmpty().withMessage('Profile ID is required'),
+        body('count').isInt({ min: 1, max: 100 }).withMessage('Count must be between 1 and 100'),
+        body('options.csmsUrl').optional().isURL().withMessage('CSMS URL must be valid'),
+        body('options.autoStart').optional().isBoolean().withMessage('Auto start must be boolean')
+    ],
+    simulatorController.createStationsFromProfile
 );
 
 /**
@@ -93,8 +91,8 @@ router.post('/stations/from-profile',
  * @access  Private (Admin/Operator)
  */
 router.put('/stations/:stationId/start',
-  param('stationId').notEmpty().withMessage('Station ID is required'),
-  simulatorController.startStation
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.startStation
 );
 
 /**
@@ -103,8 +101,8 @@ router.put('/stations/:stationId/start',
  * @access  Private (Admin/Operator)
  */
 router.put('/stations/:stationId/stop',
-  param('stationId').notEmpty().withMessage('Station ID is required'),
-  simulatorController.stopStation
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.stopStation
 );
 
 /**
@@ -113,8 +111,8 @@ router.put('/stations/:stationId/stop',
  * @access  Private (Admin/Operator)
  */
 router.delete('/stations/:stationId',
-  param('stationId').notEmpty().withMessage('Station ID is required'),
-  simulatorController.removeStation
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.removeStation
 );
 
 /**
@@ -143,12 +141,11 @@ router.delete('/stations/remove-all', simulatorController.removeAllStations);
  * @desc    Switch station protocol
  * @access  Private (Admin/Operator)
  */
-router.put('/stations/:stationId/protocol',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    body('protocol').isIn(['1.6J', '2.0.1']).withMessage('Protocol must be 1.6J or 2.0.1')
-  ],
-  simulatorController.switchStationProtocol
+router.put('/stations/:stationId/protocol', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        body('protocol').isIn(['1.6J', '2.0.1']).withMessage('Protocol must be 1.6J or 2.0.1')
+    ],
+    simulatorController.switchStationProtocol
 );
 
 /**
@@ -157,8 +154,8 @@ router.put('/stations/:stationId/protocol',
  * @access  Private (Admin/Operator)
  */
 router.put('/stations/:stationId/config',
-  param('stationId').notEmpty().withMessage('Station ID is required'),
-  simulatorController.updateStationConfig
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.updateStationConfig
 );
 
 /**
@@ -166,16 +163,15 @@ router.put('/stations/:stationId/config',
  * @desc    Simulate vehicle connection
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
-    body('vehicleType').optional().isIn(['compact', 'sedan', 'suv', 'delivery']).withMessage('Invalid vehicle type'),
-    body('initialSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Initial SoC must be between 0 and 100'),
-    body('targetSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Target SoC must be between 0 and 100'),
-    body('userScenario').optional().isIn(['normal', 'hasty', 'careful']).withMessage('Invalid user scenario')
-  ],
-  simulatorController.simulateVehicleConnection
+router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
+        body('vehicleType').optional().isIn(['compact', 'sedan', 'suv', 'delivery']).withMessage('Invalid vehicle type'),
+        body('initialSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Initial SoC must be between 0 and 100'),
+        body('targetSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Target SoC must be between 0 and 100'),
+        body('userScenario').optional().isIn(['normal', 'hasty', 'careful']).withMessage('Invalid user scenario')
+    ],
+    simulatorController.simulateVehicleConnection
 );
 
 /**
@@ -183,12 +179,11 @@ router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect',
  * @desc    Simulate vehicle disconnection
  * @access  Private (Admin/Operator)
  */
-router.delete('/stations/:stationId/connectors/:connectorId/vehicle',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer')
-  ],
-  simulatorController.simulateVehicleDisconnection
+router.delete('/stations/:stationId/connectors/:connectorId/vehicle', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer')
+    ],
+    simulatorController.simulateVehicleDisconnection
 );
 
 /**
@@ -196,14 +191,13 @@ router.delete('/stations/:stationId/connectors/:connectorId/vehicle',
  * @desc    Start charging session
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/:stationId/connectors/:connectorId/charging/start',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
-    body('idTag').notEmpty().withMessage('ID tag is required'),
-    body('chargingProfile').optional().isObject().withMessage('Charging profile must be an object')
-  ],
-  simulatorController.startChargingSession
+router.post('/stations/:stationId/connectors/:connectorId/charging/start', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
+        body('idTag').notEmpty().withMessage('ID tag is required'),
+        body('chargingProfile').optional().isObject().withMessage('Charging profile must be an object')
+    ],
+    simulatorController.startChargingSession
 );
 
 /**
@@ -211,12 +205,11 @@ router.post('/stations/:stationId/connectors/:connectorId/charging/start',
  * @desc    Stop charging session
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/:stationId/connectors/:connectorId/charging/stop',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer')
-  ],
-  simulatorController.stopChargingSession
+router.post('/stations/:stationId/connectors/:connectorId/charging/stop', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer')
+    ],
+    simulatorController.stopChargingSession
 );
 
 /**
@@ -224,13 +217,12 @@ router.post('/stations/:stationId/connectors/:connectorId/charging/stop',
  * @desc    Execute user scenario
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/:stationId/connectors/:connectorId/scenario',
-  [
-    param('stationId').notEmpty().withMessage('Station ID is required'),
-    param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
-    body('scenario').isIn(['emergency_stop', 'user_disconnect', 'change_target_soc', 'payment_issue']).withMessage('Invalid scenario')
-  ],
-  simulatorController.simulateUserScenario
+router.post('/stations/:stationId/connectors/:connectorId/scenario', [
+        param('stationId').notEmpty().withMessage('Station ID is required'),
+        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
+        body('scenario').isIn(['emergency_stop', 'user_disconnect', 'change_target_soc', 'payment_issue']).withMessage('Invalid scenario')
+    ],
+    simulatorController.simulateUserScenario
 );
 
 /**
@@ -238,13 +230,12 @@ router.post('/stations/:stationId/connectors/:connectorId/scenario',
  * @desc    Run predefined scenario
  * @access  Private (Admin/Operator)
  */
-router.post('/scenarios/:scenarioId/run',
-  [
-    param('scenarioId').notEmpty().withMessage('Scenario ID is required'),
-    body('clearExisting').optional().isBoolean().withMessage('Clear existing must be boolean'),
-    body('manualStop').optional().isBoolean().withMessage('Manual stop must be boolean')
-  ],
-  simulatorController.runScenario
+router.post('/scenarios/:scenarioId/run', [
+        param('scenarioId').notEmpty().withMessage('Scenario ID is required'),
+        body('clearExisting').optional().isBoolean().withMessage('Clear existing must be boolean'),
+        body('manualStop').optional().isBoolean().withMessage('Manual stop must be boolean')
+    ],
+    simulatorController.runScenario
 );
 
 /**
@@ -260,8 +251,8 @@ router.get('/export', simulatorController.exportConfiguration);
  * @access  Private (Admin/Operator)
  */
 router.post('/import',
-  body('stations').isArray().withMessage('Stations must be an array'),
-  simulatorController.importConfiguration
+    body('stations').isArray().withMessage('Stations must be an array'),
+    simulatorController.importConfiguration
 );
 
 // Vehicle scenario presets endpoint
@@ -271,49 +262,49 @@ router.post('/import',
  * @access  Private (Admin/Operator)
  */
 router.get('/vehicle-scenarios', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      scenarios: {
-        'quick_charge': {
-          name: 'Quick Charge',
-          description: 'Fast charging session (20% → 80%)',
-          vehicleType: 'compact',
-          initialSoC: 20,
-          targetSoC: 80,
-          userScenario: 'hasty',
-          estimatedDuration: '45 minutes'
-        },
-        'full_charge': {
-          name: 'Full Charge',
-          description: 'Complete charging session (15% → 100%)',
-          vehicleType: 'sedan',
-          initialSoC: 15,
-          targetSoC: 100,
-          userScenario: 'normal',
-          estimatedDuration: '4-6 hours'
-        },
-        'top_up': {
-          name: 'Top Up',
-          description: 'Quick top-up session (70% → 90%)',
-          vehicleType: 'suv',
-          initialSoC: 70,
-          targetSoC: 90,
-          userScenario: 'careful',
-          estimatedDuration: '30 minutes'
-        },
-        'delivery_charge': {
-          name: 'Delivery Vehicle',
-          description: 'Commercial vehicle charging (25% → 95%)',
-          vehicleType: 'delivery',
-          initialSoC: 25,
-          targetSoC: 95,
-          userScenario: 'normal',
-          estimatedDuration: '2-3 hours'
+    res.json({
+        success: true,
+        data: {
+            scenarios: {
+                'quick_charge': {
+                    name: 'Quick Charge',
+                    description: 'Fast charging session (20% → 80%)',
+                    vehicleType: 'compact',
+                    initialSoC: 20,
+                    targetSoC: 80,
+                    userScenario: 'hasty',
+                    estimatedDuration: '45 minutes'
+                },
+                'full_charge': {
+                    name: 'Full Charge',
+                    description: 'Complete charging session (15% → 100%)',
+                    vehicleType: 'sedan',
+                    initialSoC: 15,
+                    targetSoC: 100,
+                    userScenario: 'normal',
+                    estimatedDuration: '4-6 hours'
+                },
+                'top_up': {
+                    name: 'Top Up',
+                    description: 'Quick top-up session (70% → 90%)',
+                    vehicleType: 'suv',
+                    initialSoC: 70,
+                    targetSoC: 90,
+                    userScenario: 'careful',
+                    estimatedDuration: '30 minutes'
+                },
+                'delivery_charge': {
+                    name: 'Delivery Vehicle',
+                    description: 'Commercial vehicle charging (25% → 95%)',
+                    vehicleType: 'delivery',
+                    initialSoC: 25,
+                    targetSoC: 95,
+                    userScenario: 'normal',
+                    estimatedDuration: '2-3 hours'
+                }
+            }
         }
-      }
-    }
-  });
+    });
 });
 
 // Real-time data endpoints
@@ -323,35 +314,35 @@ router.get('/vehicle-scenarios', (req, res) => {
  * @access  Private (Admin/Operator)
  */
 router.get('/realtime/stations', (req, res) => {
-  const stations = simulatorController.simulationManager.getAllStationsStatus();
-  
-  // Transform data for real-time dashboard
-  const realtimeData = Object.values(stations).map(station => ({
-    stationId: station.stationId,
-    status: station.status,
-    isOnline: station.isOnline,
-    protocol: station.config.ocppVersion,
-    connectors: station.connectors.map(c => ({
-      connectorId: c.connectorId,
-      status: c.status,
-      currentPower: Math.round(c.currentPower),
-      energyDelivered: Math.round(c.energyDelivered * 100) / 100,
-      hasActiveTransaction: !!c.transaction,
-      vehicle: station.connectors.find(conn => conn.connectorId === c.connectorId)?.vehicle || null
-    })),
-    location: station.config.location || 'unknown',
-    vendor: station.config.vendor,
-    model: station.config.model
-  }));
+    const stations = simulatorController.simulationManager.getAllStationsStatus();
 
-  res.json({
-    success: true,
-    data: {
-      stations: realtimeData,
-      timestamp: new Date().toISOString(),
-      statistics: simulatorController.simulationManager.getStatistics()
-    }
-  });
+    // Transform data for real-time dashboard
+    const realtimeData = Object.values(stations).map(station => ({
+        stationId: station.stationId,
+        status: station.status,
+        isOnline: station.isOnline,
+        protocol: station.config.ocppVersion,
+        connectors: station.connectors.map(c => ({
+            connectorId: c.connectorId,
+            status: c.status,
+            currentPower: Math.round(c.currentPower),
+            energyDelivered: Math.round(c.energyDelivered * 100) / 100,
+            hasActiveTransaction: !!c.transaction,
+            vehicle: station.connectors.find(conn => conn.connectorId === c.connectorId) ? .vehicle || null
+        })),
+        location: station.config.location || 'unknown',
+        vendor: station.config.vendor,
+        model: station.config.model
+    }));
+
+    res.json({
+        success: true,
+        data: {
+            stations: realtimeData,
+            timestamp: new Date().toISOString(),
+            statistics: simulatorController.simulationManager.getStatistics()
+        }
+    });
 });
 
 /**
@@ -360,22 +351,164 @@ router.get('/realtime/stations', (req, res) => {
  * @access  Private (Admin/Operator)
  */
 router.get('/health', (req, res) => {
-  const statistics = simulatorController.simulationManager.getStatistics();
-  
-  res.json({
-    success: true,
-    data: {
-      status: 'healthy',
-      simulator: {
-        isRunning: statistics.isRunning,
-        totalStations: statistics.totalStations,
-        activeStations: statistics.activeStations,
-        uptime: statistics.uptime
-      },
-      protocols: statistics.protocolDistribution,
-      timestamp: new Date().toISOString()
-    }
-  });
+    const statistics = simulatorController.simulationManager.getStatistics();
+
+    res.json({
+        success: true,
+        data: {
+            status: 'healthy',
+            simulator: {
+                isRunning: statistics.isRunning,
+                totalStations: statistics.totalStations,
+                activeStations: statistics.activeStations,
+                uptime: statistics.uptime
+            },
+            protocols: statistics.protocolDistribution,
+            timestamp: new Date().toISOString()
+        }
+    });
 });
+
+/**
+ * @route   POST /api/simulator/stations/:stationId/clone
+ * @desc    Clone station
+ * @access  Private (Admin/Operator)
+ */
+router.post('/stations/:stationId/clone',
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.cloneStation
+);
+
+/**
+ * @route   GET /api/simulator/health
+ * @desc    Get health summary
+ * @access  Private (Admin/Operator)
+ */
+router.get('/health', simulatorController.getHealthSummary);
+
+/**
+ * @route   GET /api/simulator/stations/:stationId/health
+ * @desc    Get station health
+ * @access  Private (Admin/Operator)
+ */
+router.get('/stations/:stationId/health',
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.getStationHealth
+);
+
+/**
+ * @route   GET /api/simulator/stations/:stationId/history
+ * @desc    Get station history
+ * @access  Private (Admin/Operator)
+ */
+router.get('/stations/:stationId/history',
+    param('stationId').notEmpty().withMessage('Station ID is required'),
+    simulatorController.getStationHistory
+);
+
+/**
+ * @route   GET /api/simulator/groups
+ * @desc    Get all groups
+ * @access  Private (Admin/Operator)
+ */
+router.get('/groups', simulatorController.getGroups);
+
+/**
+ * @route   GET /api/simulator/groups/:groupId/stations
+ * @desc    Get stations by group
+ * @access  Private (Admin/Operator)
+ */
+router.get('/groups/:groupId/stations',
+    param('groupId').notEmpty().withMessage('Group ID is required'),
+    simulatorController.getStationsByGroup
+);
+
+/**
+ * @route   GET /api/simulator/networks
+ * @desc    Get all networks
+ * @access  Private (Admin/Operator)
+ */
+router.get('/networks', simulatorController.getNetworks);
+
+/**
+ * @route   GET /api/simulator/networks/:networkId/stations
+ * @desc    Get stations by network
+ * @access  Private (Admin/Operator)
+ */
+router.get('/networks/:networkId/stations',
+    param('networkId').notEmpty().withMessage('Network ID is required'),
+    simulatorController.getStationsByNetwork
+);
+
+/**
+ * @route   POST /api/simulator/batch/start
+ * @desc    Batch start stations
+ * @access  Private (Admin/Operator)
+ */
+router.post('/batch/start',
+    body('stationIds').isArray().withMessage('stationIds must be an array'),
+    body('stationIds.*').isString().withMessage('Each station ID must be a string'),
+    simulatorController.batchStartStations
+);
+
+/**
+ * @route   POST /api/simulator/batch/stop
+ * @desc    Batch stop stations
+ * @access  Private (Admin/Operator)
+ */
+router.post('/batch/stop',
+    body('stationIds').isArray().withMessage('stationIds must be an array'),
+    body('stationIds.*').isString().withMessage('Each station ID must be a string'),
+    simulatorController.batchStopStations
+);
+
+/**
+ * @route   POST /api/simulator/batch/update
+ * @desc    Batch update stations
+ * @access  Private (Admin/Operator)
+ */
+router.post('/batch/update',
+    body('stationIds').isArray().withMessage('stationIds must be an array'),
+    body('updates').isObject().withMessage('updates must be an object'),
+    simulatorController.batchUpdateStations
+);
+
+/**
+ * @route   GET /api/simulator/health/:status
+ * @desc    Get stations by health status
+ * @access  Private (Admin/Operator)
+ */
+router.get('/health/:status',
+    param('status').isIn(['healthy', 'warning', 'critical']).withMessage('Invalid health status'),
+    simulatorController.getStationsByHealthStatus
+);
+
+/**
+ * @route   POST /api/simulator/backup
+ * @desc    Create backup
+ * @access  Private (Admin)
+ */
+router.post('/backup',
+    authorize(['admin']),
+    simulatorController.createBackup
+);
+
+/**
+ * @route   GET /api/simulator/backups
+ * @desc    List backups
+ * @access  Private (Admin/Operator)
+ */
+router.get('/backups', simulatorController.listBackups);
+
+/**
+ * @route   POST /api/simulator/backup/restore
+ * @desc    Restore from backup
+ * @access  Private (Admin)
+ */
+router.post('/backup/restore',
+    authorize(['admin']),
+    body('backupFile').notEmpty().withMessage('backupFile is required'),
+    simulatorController.restoreFromBackup
+);
 
 export default router;
