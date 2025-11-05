@@ -172,6 +172,83 @@ const options = {
                         }
                     }
                 }
+            },
+            responses: {
+                BadRequest: {
+                    description: 'Bad request - Invalid input parameters',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            },
+                            example: {
+                                success: false,
+                                error: 'Validation failed',
+                                details: 'Invalid input parameters'
+                            }
+                        }
+                    }
+                },
+                Unauthorized: {
+                    description: 'Unauthorized - Authentication required',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            },
+                            example: {
+                                success: false,
+                                error: 'Unauthorized',
+                                details: 'Authentication token is missing or invalid'
+                            }
+                        }
+                    }
+                },
+                Forbidden: {
+                    description: 'Forbidden - Insufficient permissions',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            },
+                            example: {
+                                success: false,
+                                error: 'Forbidden',
+                                details: 'You do not have permission to access this resource'
+                            }
+                        }
+                    }
+                },
+                NotFound: {
+                    description: 'Not found - Resource does not exist',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            },
+                            example: {
+                                success: false,
+                                error: 'Not found',
+                                details: 'The requested resource was not found'
+                            }
+                        }
+                    }
+                },
+                InternalServerError: {
+                    description: 'Internal server error',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            },
+                            example: {
+                                success: false,
+                                error: 'Internal server error',
+                                details: 'An unexpected error occurred'
+                            }
+                        }
+                    }
+                }
             }
         },
         tags: [{

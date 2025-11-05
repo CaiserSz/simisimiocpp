@@ -10,16 +10,56 @@ router.use(authenticate);
 router.use(authorize(['admin', 'operator'])); // Only admin and operators can control simulator
 
 /**
- * @route   GET /api/simulator/overview
- * @desc    Get simulation overview
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/overview:
+ *   get:
+ *     summary: Get simulation overview
+ *     description: Returns overview of the simulation including statistics and status
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Simulation overview retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/Statistics'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  */
 router.get('/overview', simulatorController.getSimulationOverview);
 
 /**
- * @route   GET /api/simulator/statistics
- * @desc    Get simulation statistics
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/statistics:
+ *   get:
+ *     summary: Get simulation statistics
+ *     description: Returns detailed statistics about the simulation
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/Statistics'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/statistics', simulatorController.getStatistics);
 
@@ -38,16 +78,65 @@ router.get('/profiles', simulatorController.getProfiles);
 router.get('/scenarios', simulatorController.getScenarios);
 
 /**
- * @route   GET /api/simulator/stations
- * @desc    Get all stations
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations:
+ *   get:
+ *     summary: Get all stations
+ *     description: Returns a list of all simulated charging stations
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Stations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Station'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/stations', simulatorController.getStations);
 
 /**
- * @route   GET /api/simulator/stations/:stationId
- * @desc    Get specific station
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/{stationId}:
+ *   get:
+ *     summary: Get specific station
+ *     description: Returns detailed information about a specific station
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: stationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Station identifier
+ *     responses:
+ *       200:
+ *         description: Station retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/Station'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/stations/:stationId',
     param('stationId').notEmpty().withMessage('Station ID is required'),
@@ -55,9 +144,36 @@ router.get('/stations/:stationId',
 );
 
 /**
- * @route   POST /api/simulator/stations
- * @desc    Create new station
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations:
+ *   post:
+ *     summary: Create new station
+ *     description: Creates a new charging station simulator
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/StationConfig'
+ *     responses:
+ *       201:
+ *         description: Station created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/Station'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.post('/stations', [
         body('vendor').optional().isString().withMessage('Vendor must be a string'),
@@ -86,9 +202,28 @@ router.post('/stations/from-profile', [
 );
 
 /**
- * @route   PUT /api/simulator/stations/:stationId/start
- * @desc    Start station
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/{stationId}/start:
+ *   put:
+ *     summary: Start station
+ *     description: Starts a stopped charging station simulator
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: stationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Station identifier
+ *     responses:
+ *       200:
+ *         description: Station started successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/:stationId/start',
     param('stationId').notEmpty().withMessage('Station ID is required'),
@@ -96,9 +231,28 @@ router.put('/stations/:stationId/start',
 );
 
 /**
- * @route   PUT /api/simulator/stations/:stationId/stop
- * @desc    Stop station
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/{stationId}/stop:
+ *   put:
+ *     summary: Stop station
+ *     description: Stops a running charging station simulator
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: stationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Station identifier
+ *     responses:
+ *       200:
+ *         description: Station stopped successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/:stationId/stop',
     param('stationId').notEmpty().withMessage('Station ID is required'),
@@ -106,9 +260,28 @@ router.put('/stations/:stationId/stop',
 );
 
 /**
- * @route   DELETE /api/simulator/stations/:stationId
- * @desc    Remove station
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/{stationId}:
+ *   delete:
+ *     summary: Remove station
+ *     description: Removes a charging station simulator
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: stationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Station identifier
+ *     responses:
+ *       200:
+ *         description: Station removed successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.delete('/stations/:stationId',
     param('stationId').notEmpty().withMessage('Station ID is required'),
@@ -116,16 +289,36 @@ router.delete('/stations/:stationId',
 );
 
 /**
- * @route   PUT /api/simulator/stations/start-all
- * @desc    Start all stations
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/start-all:
+ *   put:
+ *     summary: Start all stations
+ *     description: Starts all stopped charging station simulators
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All stations started successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/start-all', simulatorController.startAllStations);
 
 /**
- * @route   PUT /api/simulator/stations/stop-all
- * @desc    Stop all stations
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/stop-all:
+ *   put:
+ *     summary: Stop all stations
+ *     description: Stops all running charging station simulators
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All stations stopped successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/stop-all', simulatorController.stopAllStations);
 
@@ -159,9 +352,62 @@ router.put('/stations/:stationId/config',
 );
 
 /**
- * @route   POST /api/simulator/stations/:stationId/connectors/:connectorId/vehicle/connect
- * @desc    Simulate vehicle connection
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/stations/{stationId}/connectors/{connectorId}/vehicle/connect:
+ *   post:
+ *     summary: Simulate vehicle connection
+ *     description: Simulates a vehicle connecting to a charging connector
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: stationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Station identifier
+ *       - in: path
+ *         name: connectorId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Connector identifier
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vehicleType:
+ *                 type: string
+ *                 enum: [compact, sedan, suv, delivery]
+ *                 description: Type of vehicle
+ *               initialSoC:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *                 description: Initial state of charge percentage
+ *               targetSoC:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *                 description: Target state of charge percentage
+ *               userScenario:
+ *                 type: string
+ *                 enum: [normal, hasty, careful]
+ *                 description: User charging scenario
+ *     responses:
+ *       200:
+ *         description: Vehicle connected successfully
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect', [
         param('stationId').notEmpty().withMessage('Station ID is required'),
@@ -380,9 +626,34 @@ router.post('/stations/:stationId/clone',
 );
 
 /**
- * @route   GET /api/simulator/health
- * @desc    Get health summary
- * @access  Private (Admin/Operator)
+ * @swagger
+ * /api/simulator/health:
+ *   get:
+ *     summary: Get health summary
+ *     description: Returns health status of all stations and simulation system
+ *     tags: [Simulator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Health summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       enum: [healthy, warning, critical]
+ *                     stations:
+ *                       type: object
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/health', simulatorController.getHealthSummary);
 
