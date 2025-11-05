@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 import config from './config/config.js';
 import metricsCollector from './middleware/metrics.middleware.js';
 import { setupSecurity } from './middleware/security.middleware.js';
+import { setupRequestMiddleware } from './middleware/request.middleware.js';
+import { apiVersionMiddleware, setupApiVersioning } from './middleware/apiVersion.middleware.js';
 import WebSocketServer from './services/WebSocketServer.js';
 import DatabaseManager from './utils/database.js';
 import logger from './utils/logger.js';
@@ -199,6 +201,14 @@ app.get('/health/metrics/summary', async(req, res) => {
 });
 
 // Mount API routes
+// Setup API versioning
+setupApiVersioning(app);
+
+// Versioned API routes: /api/v1/*
+app.use('/api/v1', apiVersionMiddleware, apiRouter);
+app.use('/api/v1/simulator', apiVersionMiddleware, simulatorRouter);
+app.use('/api/v1/dashboard', apiVersionMiddleware, dashboardRouter);
+
 // Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
 import ('./config/swagger.js').then(async(swaggerModule) => {
     const swaggerSetup = swaggerModule.swaggerSetup || swaggerModule.default;
@@ -214,7 +224,7 @@ import ('./config/swagger.js').then(async(swaggerModule) => {
 if (config.security.enableAuth) {
     logger.info('🔒 Authentication enabled - mounting auth routes');
     import ('./routes/auth.routes.js').then(({ default: authRoutes }) => {
-        app.use('/api/auth', authRoutes);
+        app.use('/api/v1/auth', apiVersionMiddleware, authRoutes);
         logger.info('✅ Auth routes mounted');
     }).catch(err => {
         logger.error('❌ Failed to load auth routes:', err);
@@ -222,6 +232,16 @@ if (config.security.enableAuth) {
 } else {
     logger.info('🚫 Authentication disabled - skipping auth routes');
 }
+
+// Backward compatibility: /api/* routes default to v1
+app.use('/api', apiVersionMiddleware, (req, res, next) => {
+    // Set default version if not specified
+    if (!req.apiVersion) {
+        req.apiVersion = 'v1';
+        req.apiVersionIsCurrent = true;
+    }
+    next();
+});
 
 app.use('/api/simulator', simulatorRouter);
 app.use('/api/dashboard', dashboardRouter);
