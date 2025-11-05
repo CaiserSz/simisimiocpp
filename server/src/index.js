@@ -31,6 +31,9 @@ import apiRouter from './routes/api/index.js';
 import dashboardRouter from './routes/dashboard.routes.js';
 import simulatorRouter from './routes/simulator.routes.js';
 
+// Import SimulationManager for graceful shutdown
+import { simulationManager } from './controllers/simulator.controller.js';
+
 // Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
 let swaggerSetup = null;
 try {
@@ -356,11 +359,41 @@ const startServer = async() => {
                 server.close(async() => {
                     logger.info('📡 HTTP server closed');
 
+                    // Shutdown Simulation Manager (stop all stations and OCPP connections)
+                    try {
+                        await simulationManager.shutdown();
+                        logger.info('🎛️ Simulation Manager shut down');
+                    } catch (error) {
+                        logger.error('Error shutting down Simulation Manager:', error);
+                    }
+
                     // Shutdown WebSocket server
-                    await WebSocketServer.shutdown();
+                    const wsServer = app.locals.wsServer;
+                    if (wsServer) {
+                        try {
+                            await wsServer.shutdown();
+                            logger.info('🌐 WebSocket server shut down');
+                        } catch (error) {
+                            logger.error('Error shutting down WebSocket server:', error);
+                        }
+                    }
+
+                    // Shutdown Cache Manager
+                    try {
+                        const CacheManager = (await
+                            import ('./services/CacheManager.js')).default;
+                        const cacheManager = CacheManager.getInstance();
+                        if (cacheManager) {
+                            await cacheManager.shutdown();
+                            logger.info('💾 Cache Manager shut down');
+                        }
+                    } catch (error) {
+                        logger.error('Error shutting down Cache Manager:', error);
+                    }
 
                     // Close database connection
                     await DatabaseManager.gracefulShutdown();
+                    logger.info('📊 Database connection closed');
 
                     logger.info('✅ Graceful shutdown completed');
                     process.exit(0);
@@ -370,7 +403,7 @@ const startServer = async() => {
                 setTimeout(() => {
                     logger.error('❌ Forced shutdown after timeout');
                     process.exit(1);
-                }, 10000); // 10 second timeout
+                }, 30000); // Increased to 30 seconds for graceful shutdown
 
             } catch (error) {
                 logger.error('❌ Error during shutdown:', error);

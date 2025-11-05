@@ -324,8 +324,8 @@ class WebSocketServer {
         } catch (error) {
             logger.error('Station command failed:', error);
             socket.emit('station:command:result', {
-                stationId: data ?.stationId || 'unknown',
-                command: data ?.command || 'unknown',
+                stationId: data ? .stationId || 'unknown',
+                command: data ? .command || 'unknown',
                 success: false,
                 error: error.message || 'Unknown error',
                 timestamp: new Date().toISOString()
@@ -528,16 +528,71 @@ class WebSocketServer {
      * Graceful shutdown
      */
     async shutdown() {
-        logger.info('Shutting down WebSocket server...');
+        logger.info('🛑 Shutting down WebSocket server...');
 
-        // Notify all clients
-        this.broadcastToAll('server:shutdown', {
-            message: 'Server is shutting down for maintenance'
+        if (!this.io) {
+            logger.info('⚠️ WebSocket server not initialized');
+            return { success: true, connectionsTerminated: 0 };
+        }
+
+        // Notify all clients about shutdown
+        try {
+            this.broadcastToAll('server:shutdown', {
+                message: 'Server is shutting down for maintenance',
+                timestamp: new Date().toISOString()
+            });
+
+            // Wait a moment for messages to be sent
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+            logger.error('Error sending shutdown notification:', error);
+        }
+
+        // Close all socket connections
+        let connectionsTerminated = 0;
+        const sockets = await this.io.fetchSockets();
+
+        for (const socket of sockets) {
+            try {
+                socket.emit('server:disconnect', {
+                    reason: 'Server shutdown',
+                    timestamp: new Date().toISOString()
+                });
+                socket.disconnect(true); // Force disconnect
+                connectionsTerminated++;
+            } catch (error) {
+                logger.error(`Error disconnecting socket ${socket.id}:`, error);
+            }
+        }
+
+        // Close Socket.IO server
+        return new Promise((resolve) => {
+            if (this.io) {
+                this.io.close(() => {
+                    logger.info(`✅ WebSocket server closed. Terminated ${connectionsTerminated} connections`);
+                    this.io = null;
+                    this.connectedClients.clear();
+                    this.roomSubscriptions.clear();
+                    this.messageQueue.clear();
+
+                    // Stop dashboard updates if running
+                    if (this.dashboardUpdateInterval) {
+                        clearInterval(this.dashboardUpdateInterval);
+                        this.dashboardUpdateInterval = null;
+                    }
+
+                    resolve({
+                        success: true,
+                        connectionsTerminated
+                    });
+                });
+            } else {
+                resolve({
+                    success: true,
+                    connectionsTerminated: 0
+                });
+            }
         });
-
-        // Wait a moment for messages to be sent
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
     }
 
     /**

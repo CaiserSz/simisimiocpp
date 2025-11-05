@@ -1121,6 +1121,69 @@ export class SimulationManager extends EventEmitter {
     }
 
     /**
+     * Graceful shutdown - stop all stations and cleanup
+     */
+    async shutdown() {
+        logger.info('🛑 Shutting down Simulation Manager...');
+
+        try {
+            // Stop all running stations
+            if (this.isRunning) {
+                logger.info(`⏹️  Stopping ${this.stations.size} active stations...`);
+                await this.stopAllStations();
+            }
+
+            // Disconnect all OCPP clients
+            logger.info('🔌 Disconnecting OCPP clients...');
+            const disconnectPromises = [];
+
+            for (const station of this.stations.values()) {
+                if (station.isOnline && station.ocppClient) {
+                    disconnectPromises.push(
+                        station.ocppClient.disconnect().catch(error => {
+                            logger.error(`Failed to disconnect OCPP client for ${station.stationId}:`, error);
+                        })
+                    );
+                }
+            }
+
+            await Promise.all(disconnectPromises);
+
+            // Stop health monitoring
+            if (this.healthCheckInterval) {
+                clearInterval(this.healthCheckInterval);
+                this.healthCheckInterval = null;
+            }
+
+            // Stop periodic backups
+            if (this.backupInterval) {
+                clearInterval(this.backupInterval);
+                this.backupInterval = null;
+            }
+
+            // Create final backup
+            try {
+                await this.backupManager.createBackup('shutdown');
+                logger.info('✅ Final backup created');
+            } catch (error) {
+                logger.error('Failed to create final backup:', error);
+            }
+
+            logger.info('✅ Simulation Manager shutdown completed');
+
+            return {
+                success: true,
+                stationsStopped: this.stations.size,
+                timestamp: new Date().toISOString()
+            };
+
+        } catch (error) {
+            logger.error('❌ Error during Simulation Manager shutdown:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Export simulation configuration
      */
     exportConfiguration() {
