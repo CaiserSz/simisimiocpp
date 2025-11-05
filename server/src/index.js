@@ -129,9 +129,6 @@ app.use('/api/', limiter);
 // Performance middleware
 app.use(compression());
 
-// Metrics middleware
-app.use(metricsCollector.requestMetricsMiddleware());
-
 // Security middleware
 // NoSQL injection prevention no longer needed with JSON storage
 
