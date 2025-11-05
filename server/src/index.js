@@ -84,28 +84,8 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
 }));
 
-// CORS Configuration
-const corsOptions = {
-    origin: (origin, callback) => {
-        const allowedOrigins = config.cors.allowedOrigins;
-
-        // Allow requests with no origin (like mobile apps, curl, Postman)
-        if (!origin) return callback(null, true);
-
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            logger.warn(`CORS blocked request from origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: config.cors.credentials,
-    methods: config.cors.methods,
-    allowedHeaders: config.cors.allowedHeaders,
-    exposedHeaders: config.cors.exposedHeaders,
-    maxAge: config.cors.maxAge,
-};
-
+// CORS Configuration with enhanced validation
+const corsOptions = createCorsOptions();
 app.use(cors(corsOptions));
 
 // Rate Limiting
