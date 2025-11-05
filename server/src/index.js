@@ -144,43 +144,11 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request ID middleware
-app.use((req, res, next) => {
-    req.id = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    res.locals.requestId = req.id;
-    res.set('X-Request-ID', req.id);
-    next();
-});
+// Setup request middleware (ID, timeout, logging, context)
+setupRequestMiddleware(app);
 
-// Request logging middleware
-app.use((req, res, next) => {
-    const start = Date.now();
-
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        const logData = {
-            method: req.method,
-            url: req.originalUrl,
-            status: res.statusCode,
-            duration: `${duration}ms`,
-            ip: req.ip,
-            userAgent: req.get('User-Agent'),
-            requestId: req.id
-        };
-
-        if (req.user) {
-            logData.userId = req.user.id;
-        }
-
-        if (res.statusCode >= 400) {
-            logger.warn('HTTP Request:', logData);
-        } else {
-            logger.info('HTTP Request:', logData);
-        }
-    });
-
-    next();
-});
+// Metrics middleware (after request ID for tracking)
+app.use(metricsCollector.requestMetricsMiddleware());
 
 // Static dashboard middleware
 const __filename = fileURLToPath(
