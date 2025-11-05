@@ -324,8 +324,8 @@ class WebSocketServer {
         } catch (error) {
             logger.error('Station command failed:', error);
             socket.emit('station:command:result', {
-                stationId: data ? .stationId || 'unknown',
-                command: data ? .command || 'unknown',
+                stationId: data?.stationId || 'unknown',
+                command: data?.command || 'unknown',
                 success: false,
                 error: error.message || 'Unknown error',
                 timestamp: new Date().toISOString()
