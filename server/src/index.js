@@ -263,7 +263,10 @@ app.use('/api', apiRouter);
 app.get('/health/detailed', async(req, res) => {
     try {
         const dbHealth = await DatabaseManager.healthCheck();
-        const wsStats = global.wsServerInstance ? global.wsServerInstance.getStatistics() : { error: 'WebSocket not initialized' };
+        const wsServer = req.app.locals.wsServer;
+        const wsStats = wsServer && typeof wsServer.getStatistics === 'function' 
+            ? wsServer.getStatistics() 
+            : { error: 'WebSocket not initialized' };
 
         const health = {
             status: 'healthy',
@@ -334,8 +337,8 @@ const startServer = async() => {
         // Start dashboard periodic updates
         wsServer.startDashboardUpdates();
 
-        // Store wsServer globally for stats access
-        global.wsServerInstance = wsServer;
+        // Store wsServer in app.locals for dependency injection (instead of global)
+        app.locals.wsServer = wsServer;
 
         // Start HTTP server
         const server = httpServer.listen(config.port, config.host, () => {
@@ -386,8 +389,9 @@ const startServer = async() => {
                 const stats = await DatabaseManager.getStatistics();
                 logger.debug('📈 Database Statistics:', stats);
 
-                if (global.wsServerInstance && typeof global.wsServerInstance.getStatistics === 'function') {
-                    const wsStats = global.wsServerInstance.getStatistics();
+                const wsServer = app.locals.wsServer;
+                if (wsServer && typeof wsServer.getStatistics === 'function') {
+                    const wsStats = wsServer.getStatistics();
                     logger.debug('🌐 WebSocket Statistics:', wsStats);
                 }
             } catch (error) {

@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { socketAuthenticate } from '../middleware/auth.middleware.js';
+import config from '../config/config.js';
 import logger from '../utils/logger.js';
 // StationManager removed - using SimulationManager instead
 import { simulationManager } from '../controllers/simulator.controller.js';
