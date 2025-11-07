@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import WebSocket from 'ws';
 import metricsCollector from '../../middleware/metrics.js';
 import logger from '../../utils/logger.js';
+import circuitBreakerManager from '../../utils/circuitBreaker.js';
 
 /**
  * Base OCPP Simulator Class
@@ -35,6 +36,25 @@ export class BaseOCPPSimulator extends EventEmitter {
         this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting, failed
         this.lastConnectionError = null;
         this.reconnectBackoffMultiplier = 1; // Exponential backoff multiplier
+        
+        // Circuit breaker for CSMS connection
+        this.circuitBreaker = circuitBreakerManager.getBreaker(`ocpp-${this.stationId}`, {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 30000,
+            resetTimeout: 60000
+        });
+        
+        // Listen to circuit breaker events
+        this.circuitBreaker.on('open', () => {
+            logger.warn(`🔴 Circuit breaker opened for ${this.stationId} - CSMS unavailable`);
+            this.emit('circuitBreakerOpen', { stationId: this.stationId });
+        });
+        
+        this.circuitBreaker.on('closed', () => {
+            logger.info(`🟢 Circuit breaker closed for ${this.stationId} - CSMS recovered`);
+            this.emit('circuitBreakerClosed', { stationId: this.stationId });
+        });
     }
 
     /**
@@ -332,44 +352,47 @@ export class BaseOCPPSimulator extends EventEmitter {
     }
 
     /**
-     * Send OCPP message to CSMS
+     * Send OCPP message to CSMS with circuit breaker protection
      */
     async sendMessage(action, payload) {
-        return new Promise((resolve, reject) => {
-            if (!this.isConnected) {
-                reject(new Error('Not connected to CSMS'));
-                return;
-            }
+        // Use circuit breaker to protect against CSMS failures
+        return await this.circuitBreaker.execute(async () => {
+            return new Promise((resolve, reject) => {
+                if (!this.isConnected) {
+                    reject(new Error('Not connected to CSMS'));
+                    return;
+                }
 
-            const messageId = uuidv4();
-            const message = [2, messageId, action, payload];
-            const startTime = Date.now();
-            const protocolVersion = this.getProtocolVersion();
+                const messageId = uuidv4();
+                const message = [2, messageId, action, payload];
+                const startTime = Date.now();
+                const protocolVersion = this.getProtocolVersion();
 
-            logger.debug(`📤 Sending OCPP ${protocolVersion} message: ${action}`, payload);
+                logger.debug(`📤 Sending OCPP ${protocolVersion} message: ${action}`, payload);
 
-            try {
-                this.ws.send(JSON.stringify(message));
+                try {
+                    this.ws.send(JSON.stringify(message));
 
-                // Store pending request with start time for latency calculation
-                this.pendingRequests.set(messageId, {
-                    resolve,
-                    reject,
-                    startTime,
-                    action
-                });
+                    // Store pending request with start time for latency calculation
+                    this.pendingRequests.set(messageId, {
+                        resolve,
+                        reject,
+                        startTime,
+                        action
+                    });
 
-                // Set timeout for response
-                setTimeout(() => {
-                    if (this.pendingRequests.has(messageId)) {
-                        this.pendingRequests.delete(messageId);
-                        reject(new Error(`Timeout waiting for response to ${action}`));
-                    }
-                }, 30000); // 30 seconds timeout
+                    // Set timeout for response
+                    setTimeout(() => {
+                        if (this.pendingRequests.has(messageId)) {
+                            this.pendingRequests.delete(messageId);
+                            reject(new Error(`Timeout waiting for response to ${action}`));
+                        }
+                    }, 30000); // 30 seconds timeout
 
-            } catch (error) {
-                reject(error);
-            }
+                } catch (error) {
+                    reject(error);
+                }
+            });
         });
     }
 

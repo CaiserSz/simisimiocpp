@@ -240,12 +240,17 @@ app.get('/health/detailed', async(req, res) => {
         const wsStats = wsServer && typeof wsServer.getStatistics === 'function' ?
             wsServer.getStatistics() : { error: 'WebSocket not initialized' };
 
+        // Get circuit breaker status
+        const circuitBreakerManager = (await import('./utils/circuitBreaker.js')).default;
+        const circuitBreakers = circuitBreakerManager.getAllBreakers();
+
         const health = {
             status: 'healthy',
             timestamp: new Date().toISOString(),
             version: config.version || '1.0.0',
             uptime: process.uptime(),
             environment: config.env,
+            circuitBreakers: circuitBreakers,
             services: {
                 database: dbHealth,
                 websocket: wsStats,

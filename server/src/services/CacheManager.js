@@ -2,6 +2,7 @@ import Redis from 'ioredis';
 import config from '../config/config.js';
 import metricsCollector from '../middleware/metrics.js';
 import logger from '../utils/logger.js';
+import circuitBreakerManager from '../utils/circuitBreaker.js';
 
 /**
  * Enterprise Cache Manager with Redis
@@ -20,6 +21,14 @@ class CacheManager {
 
         // Lock mechanism for race condition prevention
         this.locks = new Map(); // Track locks by key
+
+        // Circuit breaker for Redis operations
+        this.circuitBreaker = circuitBreakerManager.getBreaker('redis-cache', {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 5000,
+            resetTimeout: 30000
+        });
 
         // Cleanup expired memory cache entries every 5 minutes
         this.cleanupInterval = setInterval(() => {
@@ -113,51 +122,76 @@ class CacheManager {
     }
 
     /**
-     * Set cache with TTL
+     * Set cache with TTL (with circuit breaker and graceful degradation)
      */
     async set(key, value, ttlSeconds = 3600) {
-        if (!this.isConnected) {
-            // Fallback to memory cache
-            this.memoryCache.set(key, {
-                value: JSON.stringify(value),
-                expires: Date.now() + (ttlSeconds * 1000)
-            });
-            this.cacheStats.sets++;
-            metricsCollector.recordCacheOperation('set', 'memory', 'success');
-            logger.debug(`Memory cache SET: ${key} (TTL: ${ttlSeconds}s)`);
-            return true;
+        // Always use memory cache as fallback
+        this.memoryCache.set(key, {
+            value: JSON.stringify(value),
+            expires: Date.now() + (ttlSeconds * 1000)
+        });
+        this.cacheStats.sets++;
+        metricsCollector.recordCacheOperation('set', 'memory', 'success');
+        
+        // Try Redis if connected and circuit breaker is closed
+        if (this.isConnected && !this.circuitBreaker.isOpen()) {
+            try {
+                const serializedValue = JSON.stringify(value);
+                await this.circuitBreaker.execute(async () => {
+                    await this.redis.setex(key, ttlSeconds, serializedValue);
+                });
+                
+                metricsCollector.recordCacheOperation('set', 'redis', 'success');
+                logger.debug(`Redis cache SET: ${key} (TTL: ${ttlSeconds}s)`);
+            } catch (error) {
+                logger.warn(`Redis cache SET failed, using memory cache: ${error.message}`);
+                // Memory cache already set above, so graceful degradation is automatic
+            }
         }
-
-        try {
-            const serializedValue = JSON.stringify(value);
-            await this.redis.setex(key, ttlSeconds, serializedValue);
-
-            this.cacheStats.sets++;
-            metricsCollector.recordCacheOperation('set', 'redis', 'success');
-            logger.debug(`Redis cache SET: ${key} (TTL: ${ttlSeconds}s)`);
-            return true;
-        } catch (error) {
-            logger.error('Cache SET error:', error);
-            return false;
-        }
+        
+        return true;
     }
 
     /**
-     * Get from cache
+     * Get from cache (with circuit breaker and graceful degradation)
      */
     async get(key) {
-        if (!this.isConnected) {
-            // Fallback to memory cache
-            const cached = this.memoryCache.get(key);
-            if (cached && cached.expires > Date.now()) {
-                this.cacheStats.hits++;
-                metricsCollector.recordCacheOperation('get', 'memory', 'hit');
-                logger.debug(`Memory cache HIT: ${key}`);
-                return JSON.parse(cached.value);
-            } else if (cached) {
-                // Expired, remove it
-                this.memoryCache.delete(key);
+        // First try memory cache
+        const memoryCached = this.memoryCache.get(key);
+        if (memoryCached && memoryCached.expires > Date.now()) {
+            this.cacheStats.hits++;
+            metricsCollector.recordCacheOperation('get', 'memory', 'hit');
+            logger.debug(`Memory cache HIT: ${key}`);
+            return JSON.parse(memoryCached.value);
+        } else if (memoryCached) {
+            // Expired, remove it
+            this.memoryCache.delete(key);
+        }
+        
+        // Try Redis if connected and circuit breaker is closed
+        if (this.isConnected && !this.circuitBreaker.isOpen()) {
+            try {
+                const value = await this.circuitBreaker.execute(async () => {
+                    return await this.redis.get(key);
+                });
+                
+                if (value) {
+                    const parsedValue = JSON.parse(value);
+                    // Also cache in memory for faster access
+                    this.memoryCache.set(key, {
+                        value: value,
+                        expires: Date.now() + (3600 * 1000) // Default 1 hour
+                    });
+                    this.cacheStats.hits++;
+                    metricsCollector.recordCacheOperation('get', 'redis', 'hit');
+                    logger.debug(`Redis cache HIT: ${key}`);
+                    return parsedValue;
+                }
+            } catch (error) {
+                logger.warn(`Redis cache GET failed: ${error.message}`);
+                // Fallback to memory cache (already checked above)
             }
+        }
             this.cacheStats.misses++;
             metricsCollector.recordCacheOperation('get', 'memory', 'miss');
             logger.debug(`Memory cache MISS: ${key}`);
