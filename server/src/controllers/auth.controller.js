@@ -2,7 +2,7 @@ import { API_ERROR_CODES, HTTP_STATUS } from '../constants/api.constants.js';
 import { PASSWORD_REQUIREMENTS, USER_ROLES } from '../constants/user.constants.js';
 import userRepository from '../repositories/user.repository.js';
 import logger from '../utils/logger.js';
-import { forbidden, notFound, success, unauthorized, validationError } from '../utils/response.js';
+import { error, forbidden, notFound, success, unauthorized, validationError } from '../utils/response.js';
 
 /**
  * Lightweight Auth Controller for EV Station Simulator
@@ -54,11 +54,11 @@ export const register = async(req, res) => {
 
         logger.info(`New user registered: ${username} (${email})`);
         createSendToken(user, 201, res);
-    } catch (error) {
-        logger.error('Registration error:', error);
+    } catch (err) {
+        logger.error('Registration error:', err);
 
-        if (error.message.includes('already exists')) {
-            return error(res, error.message, HTTP_STATUS.BAD_REQUEST, API_ERROR_CODES.CONFLICT_ERROR);
+        if (err.message && err.message.includes('already exists')) {
+            return error(res, err.message, HTTP_STATUS.BAD_REQUEST, API_ERROR_CODES.CONFLICT_ERROR);
         }
 
         return error(res, 'Server error during registration', HTTP_STATUS.INTERNAL_SERVER_ERROR);
@@ -105,8 +105,8 @@ export const login = async(req, res) => {
 
         logger.info(`User logged in: ${user.username} (${user.email})`);
         createSendToken(userWithoutPassword, 200, res);
-    } catch (error) {
-        logger.error('Login error:', error);
+    } catch (err) {
+        logger.error('Login error:', err);
         return error(res, 'Server error during login', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -142,8 +142,8 @@ export const getMe = async(req, res) => {
         const { password, ...userWithoutPassword } = user;
 
         return success(res, userWithoutPassword);
-    } catch (error) {
-        logger.error('Get current user error:', error);
+    } catch (err) {
+        logger.error('Get current user error:', err);
         return error(res, 'Server error while fetching user data', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -170,10 +170,10 @@ export const updateDetails = async(req, res) => {
         const user = await userRepository.updateById(req.user.id, fieldsToUpdate);
 
         return success(res, user);
-    } catch (error) {
-        logger.error('Update user details error:', error);
+    } catch (err) {
+        logger.error('Update user details error:', err);
 
-        if (error.message.includes('already exists')) {
+        if (err.message && err.message.includes('already exists')) {
             return error(res, 'Email already exists', HTTP_STATUS.BAD_REQUEST, API_ERROR_CODES.CONFLICT_ERROR);
         }
 
@@ -212,8 +212,8 @@ export const updatePassword = async(req, res) => {
         });
 
         createSendToken(updatedUser, HTTP_STATUS.OK, res);
-    } catch (error) {
-        logger.error('Update password error:', error);
+    } catch (err) {
+        logger.error('Update password error:', err);
         return error(res, 'Server error while updating password', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -233,8 +233,8 @@ export const getAllUsers = async(req, res) => {
         const users = await userRepository.getAllUsers();
 
         return success(res, users, HTTP_STATUS.OK, { count: users.length });
-    } catch (error) {
-        logger.error('Get all users error:', error);
+    } catch (err) {
+        logger.error('Get all users error:', err);
         return error(res, 'Server error while fetching users', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -253,8 +253,8 @@ export const createBackup = async(req, res) => {
         const backupFile = await userRepository.createBackup();
 
         return success(res, { backupFile, message: 'Backup created successfully' });
-    } catch (error) {
-        logger.error('Create backup error:', error);
+    } catch (err) {
+        logger.error('Create backup error:', err);
         return error(res, 'Server error while creating backup', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -278,8 +278,8 @@ export const getSystemInfo = async(req, res) => {
                 viewer: 'viewer@simulator.local / viewer123'
             } : 'hidden'
         });
-    } catch (error) {
-        logger.error('Get system info error:', error);
+    } catch (err) {
+        logger.error('Get system info error:', err);
         return error(res, 'Server error while fetching system info', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };

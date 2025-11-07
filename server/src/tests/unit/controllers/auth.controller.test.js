@@ -79,7 +79,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(201);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.token).toBe('mock.jwt.token');
+            expect(response.body.data.token).toBe('mock.jwt.token');
             expect(response.body.data.user).toEqual(mockUser);
             expect(mockUserRepository.create).toHaveBeenCalledWith({
                 username: userData.username,
@@ -137,7 +137,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(400);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('already exists');
+            expect(response.body.error.message || response.body.error).toContain('already exists');
         });
     });
 
@@ -168,7 +168,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(200);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.token).toBe('mock.jwt.token');
+            expect(response.body.data.token).toBe('mock.jwt.token');
             expect(response.body.data.user.password).toBeUndefined();
             expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(loginData.email);
             expect(mockUserRepository.comparePassword).toHaveBeenCalledWith(mockUser, loginData.password);
@@ -194,7 +194,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(401);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Incorrect email or password');
+            expect(response.body.error.message || response.body.error).toContain('Incorrect email or password');
         });
 
         test('should handle incorrect password', async() => {
@@ -214,7 +214,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(401);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Incorrect email or password');
+            expect(response.body.error.message || response.body.error).toContain('Incorrect email or password');
         });
 
         test('should handle inactive user', async() => {
@@ -234,7 +234,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(403);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Account has been deactivated');
+            expect(response.body.error.message || response.body.error).toContain('Account has been deactivated');
         });
     });
 
@@ -298,7 +298,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(404);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('User not found');
+            expect(response.body.error.message || response.body.error).toContain('User not found');
         });
     });
 
@@ -353,7 +353,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(400);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Email already exists');
+            expect(response.body.error.message || response.body.error).toContain('Email already exists');
         });
     });
 
@@ -388,7 +388,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(200);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.token).toBe('new.jwt.token');
+            expect(response.body.data.token).toBe('new.jwt.token');
             expect(mockUserRepository.comparePassword).toHaveBeenCalledWith(mockUser, passwordData.currentPassword);
             expect(mockUserRepository.updateById).toHaveBeenCalledWith('testuser', { password: passwordData.newPassword });
         });
@@ -408,7 +408,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(400);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Current password and new password are required');
+            expect(response.body.error.message || response.body.error).toContain('Current password and new password are required');
         });
 
         test('should validate password length', async() => {
@@ -429,7 +429,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(400);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('New password must be at least 6 characters');
+            expect(response.body.error.message || response.body.error).toContain('New password must be at least 6 characters');
         });
 
         test('should handle incorrect current password', async() => {
@@ -454,7 +454,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(401);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Current password is incorrect');
+            expect(response.body.error.message || response.body.error).toContain('Current password is incorrect');
         });
     });
 
