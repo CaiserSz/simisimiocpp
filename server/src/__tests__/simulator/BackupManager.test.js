@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { SimulationManager } from '../simulator/SimulationManager.js';
+import { SimulationManager } from '../../simulator/SimulationManager.js';
 // @deprecated: Using BackupService instead of BackupManager
 
 const __filename = fileURLToPath(

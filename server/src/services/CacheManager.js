@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import config from '../config/config.js';
-import logger from '../utils/logger.js';
 import metricsCollector from '../middleware/metrics.js';
+import logger from '../utils/logger.js';
 
 /**
  * Enterprise Cache Manager with Redis
@@ -577,4 +577,5 @@ export const CacheKeys = {
 };
 
 // Export singleton instance
+export { CacheManager };
 export default new CacheManager();

@@ -1,8 +1,4 @@
-import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
-import { OCPP16JSimulator } from '../../../simulator/protocols/OCPP16JSimulator.js';
-import { OCPP201Simulator } from '../../../simulator/protocols/OCPP201Simulator.js';
-import { OCPP_VERSIONS, OCPP_SUB_PROTOCOLS } from '../../../constants/ocpp.constants.js';
 
 /**
  * OCPP Message Format Compliance Tests
@@ -14,20 +10,6 @@ import { OCPP_VERSIONS, OCPP_SUB_PROTOCOLS } from '../../../constants/ocpp.const
 
 describe('OCPP Message Format Compliance', () => {
     describe('OCPP 1.6J Message Format', () => {
-        let simulator;
-
-        beforeEach(() => {
-            simulator = new OCPP16JSimulator({
-                stationId: 'TEST_STATION_001',
-                csmsUrl: 'ws://localhost:9220'
-            });
-        });
-
-        afterEach(() => {
-            if (simulator) {
-                simulator.disconnect();
-            }
-        });
 
         test('should format BootNotification message correctly', () => {
             // Simulate message format - BaseOCPPSimulator creates: [2, messageId, action, payload]
@@ -105,20 +87,6 @@ describe('OCPP Message Format Compliance', () => {
     });
 
     describe('OCPP 2.0.1 Message Format', () => {
-        let simulator;
-
-        beforeEach(() => {
-            simulator = new OCPP201Simulator({
-                stationId: 'TEST_STATION_002',
-                csmsUrl: 'ws://localhost:9220'
-            });
-        });
-
-        afterEach(() => {
-            if (simulator) {
-                simulator.disconnect();
-            }
-        });
 
         test('should format BootNotification message correctly', () => {
             const messageId = uuidv4();
@@ -163,7 +131,7 @@ describe('OCPP Message Format Compliance', () => {
 
         test('should generate valid message IDs (UUID format)', () => {
             const messageId = uuidv4();
-            
+
             // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             expect(uuidRegex.test(messageId)).toBe(true);
@@ -188,4 +156,3 @@ describe('OCPP Message Format Compliance', () => {
         });
     });
 });
-
