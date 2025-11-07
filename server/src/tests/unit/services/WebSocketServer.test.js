@@ -1,9 +1,9 @@
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import Client from 'socket.io-client';
-import WebSocketServer from '../../services/WebSocketServer.js';
+import WebSocketServer from '../../../services/WebSocketServer.js';
 import jwt from 'jsonwebtoken';
-import config from '../../config/config.js';
+import config from '../../../config/config.js';
 
 describe('WebSocketServer', () => {
   let httpServer;

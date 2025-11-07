@@ -1,8 +1,8 @@
-import { SimulationManager } from '../../simulator/SimulationManager.js';
-import { StationSimulator } from '../../simulator/StationSimulator.js';
-import { OCPP16JSimulator } from '../../simulator/protocols/OCPP16JSimulator.js';
-import { OCPP201Simulator } from '../../simulator/protocols/OCPP201Simulator.js';
-import logger from '../../utils/logger.js';
+import { SimulationManager } from '../../../simulator/SimulationManager.js';
+import { StationSimulator } from '../../../simulator/StationSimulator.js';
+import { OCPP16JSimulator } from '../../../simulator/protocols/OCPP16JSimulator.js';
+import { OCPP201Simulator } from '../../../simulator/protocols/OCPP201Simulator.js';
+import logger from '../../../utils/logger.js';
 
 describe('CSMS Integration Tests', () => {
   let simulationManager;

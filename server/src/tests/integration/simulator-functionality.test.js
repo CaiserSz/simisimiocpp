@@ -1,6 +1,6 @@
-import { SimulationManager } from '../../simulator/SimulationManager.js';
-import { VehicleSimulator } from '../../simulator/VehicleSimulator.js';
-import { StationSimulator } from '../../simulator/StationSimulator.js';
+import { SimulationManager } from '../../../simulator/SimulationManager.js';
+import { VehicleSimulator } from '../../../simulator/VehicleSimulator.js';
+import { StationSimulator } from '../../../simulator/StationSimulator.js';
 
 describe('Simulator Functionality Tests', () => {
   let simulationManager;

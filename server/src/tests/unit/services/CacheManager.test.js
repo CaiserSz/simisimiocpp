@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import CacheManager from '../../services/CacheManager.js';
+import CacheManager from '../../../services/CacheManager.js';
 
 /**
  * CacheManager Test Suite
