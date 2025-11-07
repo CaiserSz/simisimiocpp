@@ -17,7 +17,7 @@ import metricsCollector from './middleware/metrics.js';
 import { setupRequestMiddleware } from './middleware/request.js';
 import { setupSecurity } from './middleware/security.js';
 import WebSocketServer from './services/WebSocketServer.js';
-import DatabaseManager from './utils/database.js';
+import DatabaseManager from './services/database.service.js';
 import logger from './utils/logger.js';
 import { initializePerformanceOptimizations } from './utils/performance.js';
 

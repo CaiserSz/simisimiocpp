@@ -1,5 +1,12 @@
-import logger from '../../utils/logger.js';
+import {
+    OCPP_CONFIG_KEYS,
+    OCPP_DEFAULT_CONFIG,
+    OCPP_FEATURE_PROFILES,
+    OCPP_SUB_PROTOCOLS,
+    OCPP_VERSIONS
+} from '../../constants/ocpp.constants.js';
 import metricsCollector from '../../middleware/metrics.js';
+import logger from '../../utils/logger.js';
 import { BaseOCPPSimulator } from './BaseOCPPSimulator.js';
 
 /**
@@ -27,7 +34,7 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
             'ConnectorPhaseRotation': 'NotApplicable',
             'ConnectorPhaseRotationMaxLength': '1',
             'GetConfigurationMaxKeys': '50',
-            'HeartbeatInterval': config.heartbeatInterval ? .toString() || '300',
+            [OCPP_CONFIG_KEYS.HEARTBEAT_INTERVAL]: config.heartbeatInterval ? .toString() || OCPP_DEFAULT_CONFIG.HEARTBEAT_INTERVAL,
             'LightIntensity': '50',
             'LocalAuthorizeOffline': 'true',
             'LocalPreAuthorize': 'false',
@@ -46,7 +53,13 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
             'StopTxnAlignedDataMaxLength': '16',
             'StopTxnSampledData': 'Energy.Active.Import.Register',
             'StopTxnSampledDataMaxLength': '16',
-            'SupportedFeatureProfiles': 'Core,FirmwareManagement,LocalAuthListManagement,Reservation,SmartCharging',
+            'SupportedFeatureProfiles': [
+                OCPP_FEATURE_PROFILES.CORE,
+                OCPP_FEATURE_PROFILES.FIRMWARE_MANAGEMENT,
+                OCPP_FEATURE_PROFILES.LOCAL_AUTH_LIST_MANAGEMENT,
+                OCPP_FEATURE_PROFILES.RESERVATION,
+                OCPP_FEATURE_PROFILES.SMART_CHARGING
+            ].join(','),
             'SupportedFeatureProfilesMaxLength': '100',
             'TransactionMessageAttempts': '3',
             'TransactionMessageRetryInterval': '60',
@@ -71,14 +84,14 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
      * Get protocol version string
      */
     getProtocolVersion() {
-        return '1.6J';
+        return OCPP_VERSIONS.V16J;
     }
 
     /**
      * Get WebSocket sub-protocol
      */
     getSubProtocol() {
-        return 'ocpp1.6';
+        return OCPP_SUB_PROTOCOLS.V16J;
     }
 
     /**

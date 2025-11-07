@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import CacheManager, { CacheKeys } from '../services/CacheManager.js';
-import BackupManager from '../utils/BackupManager.js';
+import BackupService from '../services/backup.service.js';
 import logger from '../utils/logger.js';
 import { StationSimulator } from './StationSimulator.js';
 
@@ -40,8 +40,8 @@ export class SimulationManager extends EventEmitter {
         this.initializeGroups();
         this.initializeNetworks();
 
-        // Initialize backup manager
-        this.backupManager = new BackupManager();
+        // Initialize backup service
+        this.backupService = new BackupService();
 
         // Load predefined profiles
         this.loadPredefinedProfiles();
@@ -943,7 +943,7 @@ export class SimulationManager extends EventEmitter {
         // Backup every hour
         this.backupInterval = setInterval(async() => {
             try {
-                await this.backupManager.backupState(this, {
+                await this.backupService.backupState(this, {
                     type: 'scheduled',
                     reason: 'periodic_backup'
                 });
@@ -957,35 +957,35 @@ export class SimulationManager extends EventEmitter {
      * Create backup
      */
     async createBackup(metadata = {}) {
-        return await this.backupManager.backupState(this, metadata);
+        return await this.backupService.backupState(this, metadata);
     }
 
     /**
      * Restore from backup
      */
     async restoreFromBackup(backupFile) {
-        return await this.backupManager.restoreState(this, backupFile);
+        return await this.backupService.restoreState(this, backupFile);
     }
 
     /**
      * List backups
      */
     async listBackups() {
-        return await this.backupManager.listBackups();
+        return await this.backupService.listBackups();
     }
 
     /**
      * Export configuration to file
      */
     async exportConfigurationToFile(filePath) {
-        return await this.backupManager.exportConfiguration(this, filePath);
+        return await this.backupService.exportConfiguration(this, filePath);
     }
 
     /**
      * Import configuration from file
      */
     async importConfigurationFromFile(filePath) {
-        return await this.backupManager.importConfiguration(this, filePath);
+        return await this.backupService.importConfiguration(this, filePath);
     }
 
     /**
@@ -1192,7 +1192,7 @@ export class SimulationManager extends EventEmitter {
 
             // Create final backup
             try {
-                await this.backupManager.createBackup('shutdown');
+                await this.backupService.createBackup('shutdown');
                 logger.info('✅ Final backup created');
             } catch (error) {
                 logger.error('Failed to create final backup:', error);

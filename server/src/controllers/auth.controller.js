@@ -1,6 +1,9 @@
 import crypto from 'crypto';
-import userStore from '../services/SimpleUserStore.js';
+import userRepository from '../repositories/user.repository.js';
 import logger from '../utils/logger.js';
+import { success, error, validationError, created, unauthorized, forbidden, notFound } from '../utils/response.js';
+import { HTTP_STATUS, API_ERROR_CODES } from '../constants/api.constants.js';
+import { USER_ROLES, PASSWORD_REQUIREMENTS } from '../constants/user.constants.js';
 
 /**
  * Lightweight Auth Controller for EV Station Simulator
@@ -9,7 +12,7 @@ import logger from '../utils/logger.js';
 
 // Create and send token
 const createSendToken = (user, statusCode, res) => {
-  const token = userStore.generateAuthToken(user);
+  const token = userRepository.generateAuthToken(user);
   
   // Cookie options
   const cookieOptions = {
@@ -20,12 +23,7 @@ const createSendToken = (user, statusCode, res) => {
   };
   
   res.cookie('jwt', token, cookieOptions);
-  
-  res.status(statusCode).json({
-    success: true,
-    token,
-    data: { user }
-  });
+  return success(res, { user, token }, statusCode);
 };
 
 /**
@@ -39,25 +37,19 @@ export const register = async (req, res) => {
     
     // Basic validation
     if (!username || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username, email and password are required'
-      });
+      return validationError(res, [], 'Username, email and password are required');
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'Password must be at least 6 characters'
-      });
+    if (password.length < PASSWORD_REQUIREMENTS.MIN_LENGTH) {
+      return validationError(res, [], `Password must be at least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`);
     }
     
     // Create new user
-    const user = await userStore.create({
+    const user = await userRepository.create({
       username,
       email,
       password,
-      role: role || 'user',
+      role: role || USER_ROLES.USER,
       ...userData
     });
     
@@ -67,16 +59,10 @@ export const register = async (req, res) => {
     logger.error('Registration error:', error);
     
     if (error.message.includes('already exists')) {
-      return res.status(400).json({
-        success: false,
-        error: error.message
-      });
+      return error(res, error.message, HTTP_STATUS.BAD_REQUEST, API_ERROR_CODES.CONFLICT_ERROR);
     }
     
-    res.status(500).json({
-      success: false,
-      error: 'Server error during registration'
-    });
+    return error(res, 'Server error during registration', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -91,41 +77,29 @@ export const login = async (req, res) => {
     
     // Check if email and password are provided
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide email and password'
-      });
+      return validationError(res, [], 'Please provide email and password');
     }
     
     // Find user by email
-    const user = await userStore.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Incorrect email or password'
-      });
+      return unauthorized(res, 'Incorrect email or password');
     }
     
     // Check password
-    const isMatch = await userStore.comparePassword(user, password);
+    const isMatch = await userRepository.comparePassword(user, password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        error: 'Incorrect email or password'
-      });
+      return unauthorized(res, 'Incorrect email or password');
     }
     
     // Check if user is active
     if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        error: 'Account has been deactivated'
-      });
+      return forbidden(res, 'Account has been deactivated');
     }
     
     // Update last login
-    await userStore.updateLastLogin(user.id);
+    await userRepository.updateLastLogin(user.id);
     
     // Remove password from user object
     const { password: _, ...userWithoutPassword } = user;
@@ -134,10 +108,7 @@ export const login = async (req, res) => {
     createSendToken(userWithoutPassword, 200, res);
   } catch (error) {
     logger.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error during login'
-    });
+    return error(res, 'Server error during login', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -152,10 +123,7 @@ export const logout = (req, res) => {
     httpOnly: true
   });
   
-  res.status(200).json({
-    success: true,
-    message: 'Successfully logged out'
-  });
+  return success(res, { message: 'Successfully logged out' });
 };
 
 /**
@@ -165,28 +133,19 @@ export const logout = (req, res) => {
  */
 export const getMe = async (req, res) => {
   try {
-    const user = await userStore.findById(req.user.id);
+    const user = await userRepository.findById(req.user.id);
     
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
+      return notFound(res, 'User');
     }
 
     // Remove password from response
     const { password, ...userWithoutPassword } = user;
     
-    res.status(200).json({
-      success: true,
-      data: userWithoutPassword
-    });
+    return success(res, userWithoutPassword);
   } catch (error) {
     logger.error('Get current user error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error while fetching user data'
-    });
+    return error(res, 'Server error while fetching user data', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -209,26 +168,17 @@ export const updateDetails = async (req, res) => {
       fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
     );
     
-    const user = await userStore.updateById(req.user.id, fieldsToUpdate);
+    const user = await userRepository.updateById(req.user.id, fieldsToUpdate);
     
-    res.status(200).json({
-      success: true,
-      data: user
-    });
+    return success(res, user);
   } catch (error) {
     logger.error('Update user details error:', error);
     
     if (error.message.includes('already exists')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email already exists'
-      });
+      return error(res, 'Email already exists', HTTP_STATUS.BAD_REQUEST, API_ERROR_CODES.CONFLICT_ERROR);
     }
     
-    res.status(500).json({
-      success: false,
-      error: 'Server error while updating user details'
-    });
+    return error(res, 'Server error while updating user details', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -242,42 +192,30 @@ export const updatePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Current password and new password are required'
-      });
+      return validationError(res, [], 'Current password and new password are required');
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'New password must be at least 6 characters'
-      });
+    if (newPassword.length < PASSWORD_REQUIREMENTS.MIN_LENGTH) {
+      return validationError(res, [], `New password must be at least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`);
     }
     
-    const user = await userStore.findById(req.user.id);
+    const user = await userRepository.findById(req.user.id);
     
     // Check current password
-    const isMatch = await userStore.comparePassword(user, currentPassword);
+    const isMatch = await userRepository.comparePassword(user, currentPassword);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        error: 'Current password is incorrect'
-      });
+      return unauthorized(res, 'Current password is incorrect');
     }
     
     // Update password
-    const updatedUser = await userStore.updateById(req.user.id, {
+    const updatedUser = await userRepository.updateById(req.user.id, {
       password: newPassword
     });
     
-    createSendToken(updatedUser, 200, res);
+    createSendToken(updatedUser, HTTP_STATUS.OK, res);
   } catch (error) {
     logger.error('Update password error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error while updating password'
-    });
+    return error(res, 'Server error while updating password', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -289,26 +227,16 @@ export const updatePassword = async (req, res) => {
 export const getAllUsers = async (req, res) => {
   try {
     // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied. Admin role required.'
-      });
+    if (req.user.role !== USER_ROLES.ADMIN) {
+      return forbidden(res, 'Access denied. Admin role required.');
     }
 
-    const users = await userStore.getAllUsers();
+    const users = await userRepository.getAllUsers();
     
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users
-    });
+    return success(res, users, HTTP_STATUS.OK, { count: users.length });
   } catch (error) {
     logger.error('Get all users error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error while fetching users'
-    });
+    return error(res, 'Server error while fetching users', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -319,26 +247,16 @@ export const getAllUsers = async (req, res) => {
  */
 export const createBackup = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied. Admin role required.'
-      });
+    if (req.user.role !== USER_ROLES.ADMIN) {
+      return forbidden(res, 'Access denied. Admin role required.');
     }
 
-    const backupFile = await userStore.createBackup();
+    const backupFile = await userRepository.createBackup();
     
-    res.status(200).json({
-      success: true,
-      message: 'Backup created successfully',
-      backupFile
-    });
+    return success(res, { backupFile, message: 'Backup created successfully' });
   } catch (error) {
     logger.error('Create backup error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error while creating backup'
-    });
+    return error(res, 'Server error while creating backup', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -349,26 +267,20 @@ export const createBackup = async (req, res) => {
  */
 export const getSystemInfo = async (req, res) => {
   try {
-    const health = await userStore.healthCheck();
+    const health = await userRepository.healthCheck();
     
-    res.status(200).json({
-      success: true,
-      data: {
-        systemType: 'EV Station Simulator',
-        userStorage: 'JSON-based (lightweight)',
-        ...health,
-        defaultCredentials: process.env.NODE_ENV !== 'production' ? {
-          admin: 'admin@simulator.local / admin123',
-          operator: 'operator@simulator.local / operator123', 
-          viewer: 'viewer@simulator.local / viewer123'
-        } : 'hidden'
-      }
+    return success(res, {
+      systemType: 'EV Station Simulator',
+      userStorage: 'JSON-based (lightweight)',
+      ...health,
+      defaultCredentials: process.env.NODE_ENV !== 'production' ? {
+        admin: 'admin@simulator.local / admin123',
+        operator: 'operator@simulator.local / operator123', 
+        viewer: 'viewer@simulator.local / viewer123'
+      } : 'hidden'
     });
   } catch (error) {
     logger.error('Get system info error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error while fetching system info'
-    });
+    return error(res, 'Server error while fetching system info', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 };

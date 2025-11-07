@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import userStore from '../services/SimpleUserStore.js';
+import userRepository from '../repositories/user.repository.js';
 import logger from '../utils/logger.js';
 import config from '../config/config.js';
 
@@ -43,7 +43,7 @@ export const authenticate = async (req, res, next) => {
       const decoded = jwt.verify(token, config.security.jwtSecret);
       
       // Get user from the token
-      const user = await userStore.findById(decoded.id);
+      const user = await userRepository.findById(decoded.id);
       
       if (!user) {
         return res.status(401).json({
@@ -132,7 +132,7 @@ export const requirePermission = (permission) => {
     }
 
     // Check if user has required permission
-    if (!userStore.hasPermission(req.user, permission)) {
+    if (!userRepository.hasPermission(req.user, permission)) {
       return res.status(403).json({
         success: false,
         error: `Access denied. Required permission: ${permission}`
@@ -155,7 +155,7 @@ export const optionalAuth = async (req, res, next) => {
       
       try {
         const decoded = jwt.verify(token, config.security.jwtSecret);
-        const user = await userStore.findById(decoded.id);
+        const user = await userRepository.findById(decoded.id);
         
         if (user && user.isActive) {
           const { password, ...userWithoutPassword } = user;
