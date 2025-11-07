@@ -3,6 +3,13 @@ import { SimulationManager } from '../simulator/SimulationManager.js';
 import { asyncHandler } from '../utils/errorHandler.js';
 import logger from '../utils/logger.js';
 
+/**
+ * @typedef {import('../types/station.types.js').StationConfig} StationConfig
+ * @typedef {import('../types/station.types.js').Station} Station
+ * @typedef {import('../types/station.types.js').VehicleConfig} VehicleConfig
+ * @typedef {import('../types/api.types.js').APIResponse} APIResponse
+ */
+
 // Global simulation manager instance
 const simulationManager = new SimulationManager();
 

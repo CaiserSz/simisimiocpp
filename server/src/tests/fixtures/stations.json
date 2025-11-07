@@ -1,0 +1,52 @@
+/**
+ * Test Fixtures - Station Data
+ * 
+ * Created: 2025-01-11
+ * Purpose: Reusable test data for stations
+ */
+
+export const mockStationConfig = {
+    stationId: 'TEST_STATION_001',
+    vendor: 'TestVendor',
+    model: 'TestModel',
+    ocppVersion: '1.6J',
+    maxPower: 22000,
+    connectorCount: 2,
+    csmsUrl: 'ws://localhost:9220',
+    heartbeatInterval: 300
+};
+
+export const mockStationProfiles = {
+    urban_ac: {
+        name: 'Urban AC Charger',
+        vendor: 'UrbanCharge',
+        model: 'UC-AC-7',
+        connectorCount: 2,
+        maxPower: 7400,
+        ocppVersion: '1.6J',
+        heartbeatInterval: 300
+    },
+    urban_dc_fast: {
+        name: 'Urban DC Fast Charger',
+        vendor: 'FastCharge Co',
+        model: 'FC-DC-50',
+        connectorCount: 1,
+        maxPower: 50000,
+        ocppVersion: '2.0.1',
+        heartbeatInterval: 180
+    }
+};
+
+export const mockVehicleConfig = {
+    vehicleType: 'sedan',
+    initialSoC: 30,
+    targetSoC: 80,
+    userScenario: 'normal'
+};
+
+export default {
+    mockStationConfig,
+    mockStationProfiles,
+    mockVehicleConfig
+};
+

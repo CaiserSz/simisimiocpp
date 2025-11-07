@@ -1,0 +1,51 @@
+/**
+ * Test Fixtures - User Data
+ * 
+ * Created: 2025-01-11
+ * Purpose: Reusable test data for users
+ */
+
+export const mockUsers = {
+    admin: {
+        id: 'admin',
+        username: 'admin',
+        email: 'admin@test.local',
+        password: 'admin123',
+        role: 'admin',
+        isActive: true,
+        permissions: ['*']
+    },
+    operator: {
+        id: 'operator',
+        username: 'operator',
+        email: 'operator@test.local',
+        password: 'operator123',
+        role: 'operator',
+        isActive: true,
+        permissions: ['stations:read', 'stations:write']
+    },
+    user: {
+        id: 'user',
+        username: 'user',
+        email: 'user@test.local',
+        password: 'user123',
+        role: 'user',
+        isActive: true,
+        permissions: ['stations:read']
+    }
+};
+
+export const mockUserCreateRequest = {
+    username: 'testuser',
+    email: 'test@example.com',
+    password: 'password123',
+    role: 'user',
+    firstName: 'Test',
+    lastName: 'User'
+};
+
+export default {
+    mockUsers,
+    mockUserCreateRequest
+};
+

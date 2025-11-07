@@ -1,9 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { jest } from '@jest/globals';
 import { SimulationManager } from '../../simulator/SimulationManager.js';
-import BackupManager from '../../utils/BackupManager.js';
+// @deprecated: Using BackupService instead of BackupManager
 
 const __filename = fileURLToPath(
     import.meta.url);

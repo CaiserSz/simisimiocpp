@@ -62,12 +62,12 @@
         "testEnvironment": "node",
         "transform": {},
         "testMatch": [
-            "**/__tests__/**/*.test.js"
+            "**/tests/**/*.test.js"
         ],
         "testTimeout": 30000,
         "collectCoverageFrom": [
             "src/**/*.js",
-            "!src/__tests__/**",
+            "!src/tests/**",
             "!src/app.js",
             "!src/**/*.test.js"
         ],
@@ -78,7 +78,7 @@
             "html"
         ],
         "setupFilesAfterEnv": [
-            "<rootDir>/src/__tests__/setup.js"
+            "<rootDir>/src/tests/utils/setup.js"
         ],
         "moduleNameMapper": {
             "^(\\.{1,2}/.*)\\.js$": "$1"

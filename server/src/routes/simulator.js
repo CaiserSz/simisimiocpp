@@ -1,13 +1,25 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
 import * as simulatorController from '../controllers/simulator.controller.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import {
+    validateStationId,
+    validateConnectorId,
+    validateCreateStation,
+    validateUpdateStationConfig,
+    validateSwitchProtocol,
+    validateVehicleConnection,
+    validateProfileId,
+    validateScenarioId,
+    validatePagination
+} from '../validators/station.validator.js';
+import { checkValidation } from '../validators/common.validator.js';
+import { USER_ROLES } from '../constants/user.constants.js';
 
 const router = Router();
 
 // Authentication middleware for all simulator routes
 router.use(authenticate);
-router.use(authorize(['admin', 'operator'])); // Only admin and operators can control simulator
+router.use(authorize([USER_ROLES.ADMIN, USER_ROLES.OPERATOR])); // Only admin and operators can control simulator
 
 /**
  * @swagger
@@ -139,7 +151,8 @@ router.get('/stations', simulatorController.getStations);
  *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/stations/:stationId',
-    param('stationId').notEmpty().withMessage('Station ID is required'),
+    ...validateStationId,
+    checkValidation,
     simulatorController.getStation
 );
 
@@ -175,15 +188,9 @@ router.get('/stations/:stationId',
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
-router.post('/stations', [
-        body('vendor').optional().isString().withMessage('Vendor must be a string'),
-        body('model').optional().isString().withMessage('Model must be a string'),
-        body('ocppVersion').isIn(['1.6J', '2.0.1']).withMessage('OCPP version must be 1.6J or 2.0.1'),
-        body('connectorCount').optional().isInt({ min: 1, max: 10 }).withMessage('Connector count must be between 1 and 10'),
-        body('maxPower').optional().isInt({ min: 1000 }).withMessage('Max power must be at least 1000W'),
-        body('csmsUrl').matches(/^wss?:\/\/.+/).withMessage('CSMS URL must be a valid WebSocket URL (ws:// or wss://)'),
-        body('heartbeatInterval').optional().isInt({ min: 60, max: 3600 }).withMessage('Heartbeat interval must be between 60 and 3600 seconds')
-    ],
+router.post('/stations',
+    ...validateCreateStation,
+    checkValidation,
     simulatorController.createStation
 );
 
@@ -192,12 +199,9 @@ router.post('/stations', [
  * @desc    Create stations from profile
  * @access  Private (Admin/Operator)
  */
-router.post('/stations/from-profile', [
-        body('profileId').notEmpty().withMessage('Profile ID is required'),
-        body('count').isInt({ min: 1, max: 100 }).withMessage('Count must be between 1 and 100'),
-        body('options.csmsUrl').optional().isURL().withMessage('CSMS URL must be valid'),
-        body('options.autoStart').optional().isBoolean().withMessage('Auto start must be boolean')
-    ],
+router.post('/stations/from-profile',
+    ...validateProfileId,
+    checkValidation,
     simulatorController.createStationsFromProfile
 );
 
@@ -226,7 +230,8 @@ router.post('/stations/from-profile', [
  *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/:stationId/start',
-    param('stationId').notEmpty().withMessage('Station ID is required'),
+    ...validateStationId,
+    checkValidation,
     simulatorController.startStation
 );
 
@@ -255,7 +260,8 @@ router.put('/stations/:stationId/start',
  *         $ref: '#/components/responses/Unauthorized'
  */
 router.put('/stations/:stationId/stop',
-    param('stationId').notEmpty().withMessage('Station ID is required'),
+    ...validateStationId,
+    checkValidation,
     simulatorController.stopStation
 );
 
@@ -284,7 +290,8 @@ router.put('/stations/:stationId/stop',
  *         $ref: '#/components/responses/Unauthorized'
  */
 router.delete('/stations/:stationId',
-    param('stationId').notEmpty().withMessage('Station ID is required'),
+    ...validateStationId,
+    checkValidation,
     simulatorController.removeStation
 );
 
@@ -334,10 +341,10 @@ router.delete('/stations/remove-all', simulatorController.removeAllStations);
  * @desc    Switch station protocol
  * @access  Private (Admin/Operator)
  */
-router.put('/stations/:stationId/protocol', [
-        param('stationId').notEmpty().withMessage('Station ID is required'),
-        body('protocol').isIn(['1.6J', '2.0.1']).withMessage('Protocol must be 1.6J or 2.0.1')
-    ],
+router.put('/stations/:stationId/protocol',
+    ...validateStationId,
+    ...validateSwitchProtocol,
+    checkValidation,
     simulatorController.switchStationProtocol
 );
 
@@ -409,14 +416,11 @@ router.put('/stations/:stationId/config',
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
-router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect', [
-        param('stationId').notEmpty().withMessage('Station ID is required'),
-        param('connectorId').isInt({ min: 1 }).withMessage('Connector ID must be a positive integer'),
-        body('vehicleType').optional().isIn(['compact', 'sedan', 'suv', 'delivery']).withMessage('Invalid vehicle type'),
-        body('initialSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Initial SoC must be between 0 and 100'),
-        body('targetSoC').optional().isFloat({ min: 0, max: 100 }).withMessage('Target SoC must be between 0 and 100'),
-        body('userScenario').optional().isIn(['normal', 'hasty', 'careful']).withMessage('Invalid user scenario')
-    ],
+router.post('/stations/:stationId/connectors/:connectorId/vehicle/connect',
+    ...validateStationId,
+    ...validateConnectorId,
+    ...validateVehicleConnection,
+    checkValidation,
     simulatorController.simulateVehicleConnection
 );
 
