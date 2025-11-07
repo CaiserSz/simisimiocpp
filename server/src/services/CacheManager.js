@@ -192,50 +192,36 @@ class CacheManager {
                 // Fallback to memory cache (already checked above)
             }
         }
-            this.cacheStats.misses++;
-            metricsCollector.recordCacheOperation('get', 'memory', 'miss');
-            logger.debug(`Memory cache MISS: ${key}`);
-            return null;
-        }
-
-        try {
-            const value = await this.redis.get(key);
-
-            if (value === null) {
-                this.cacheStats.misses++;
-                metricsCollector.recordCacheOperation('get', 'redis', 'miss');
-                logger.debug(`Redis cache MISS: ${key}`);
-                return null;
-            }
-
-            this.cacheStats.hits++;
-            metricsCollector.recordCacheOperation('get', 'redis', 'hit');
-            logger.debug(`Redis cache HIT: ${key}`);
-            return JSON.parse(value);
-        } catch (error) {
-            logger.error('Cache GET error:', error);
-            this.cacheStats.misses++;
-            return null;
-        }
+        
+        // No value found in either cache
+        this.cacheStats.misses++;
+        metricsCollector.recordCacheOperation('get', 'memory', 'miss');
+        logger.debug(`Cache MISS: ${key}`);
+        return null;
     }
 
     /**
-     * Delete from cache
+     * Delete from cache (with circuit breaker and graceful degradation)
      */
     async del(key) {
-        if (!this.isConnected) {
-            return false;
+        // Always delete from memory cache
+        this.memoryCache.delete(key);
+        
+        // Try Redis if connected and circuit breaker is closed
+        if (this.isConnected && !this.circuitBreaker.isOpen()) {
+            try {
+                await this.circuitBreaker.execute(async () => {
+                    await this.redis.del(key);
+                });
+                this.cacheStats.deletes++;
+                logger.debug(`Redis cache DEL: ${key}`);
+            } catch (error) {
+                logger.warn(`Redis cache DEL failed: ${error.message}`);
+                // Memory cache already deleted above
+            }
         }
-
-        try {
-            await this.redis.del(key);
-            this.cacheStats.deletes++;
-            logger.debug(`Cache DEL: ${key}`);
-            return true;
-        } catch (error) {
-            logger.error('Cache DEL error:', error);
-            return false;
-        }
+        
+        return true;
     }
 
     /**

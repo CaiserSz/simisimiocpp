@@ -19,6 +19,8 @@
         "test:coverage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand",
         "test:json-storage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimpleUserStore|auth.controller.updated' --runInBand",
         "test:simulator": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimulationManager|WebSocketServer' --runInBand",
+        "test:load": "k6 run src/tests/performance/load-test.js",
+        "test:stress": "k6 run --vus 2000 --duration 10m src/tests/performance/load-test.js",
         "lint": "eslint . --ext .js",
         "format": "prettier --write ."
     },
