@@ -55,4 +55,4 @@ EXPOSE 3001
 WORKDIR /app/server
 
 # Start the application
-CMD ["node", "src/index.js"]
+CMD ["node", "src/app.js"]
