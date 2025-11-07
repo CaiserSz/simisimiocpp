@@ -57,31 +57,5 @@
         "prettier": "^3.0.3",
         "socket.io-client": "^4.7.4",
         "supertest": "^6.3.3"
-    },
-    "jest": {
-        "testEnvironment": "node",
-        "transform": {},
-        "testMatch": [
-            "**/tests/**/*.test.js"
-        ],
-        "testTimeout": 30000,
-        "collectCoverageFrom": [
-            "src/**/*.js",
-            "!src/tests/**",
-            "!src/app.js",
-            "!src/**/*.test.js"
-        ],
-        "coverageDirectory": "coverage",
-        "coverageReporters": [
-            "text",
-            "lcov",
-            "html"
-        ],
-        "setupFilesAfterEnv": [
-            "<rootDir>/src/tests/utils/setup.js"
-        ],
-        "moduleNameMapper": {
-            "^(\\.{1,2}/.*)\\.js$": "$1"
-        }
     }
 }

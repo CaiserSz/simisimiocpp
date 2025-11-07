@@ -2,13 +2,13 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 import * as authController from '../../controllers/auth.controller.js';
-import userStore from '../../services/SimpleUserStore.js';
+import userRepository from '../../repositories/user.repository.js';
 
 const app = express();
 app.use(express.json());
 
-// Mock userStore methods
-jest.mock('../../services/SimpleUserStore.js', () => ({
+// Mock userRepository methods
+jest.mock('../../repositories/user.repository.js', () => ({
     __esModule: true,
     default: {
         initialize: jest.fn(),
@@ -61,8 +61,8 @@ describe('Auth Controller (JSON Storage)', () => {
                 createdAt: '2025-11-01T12:00:00.000Z'
             };
 
-            userStore.create.mockResolvedValue(mockUser);
-            userStore.generateAuthToken.mockReturnValue('mock.jwt.token');
+            userRepository.create.mockResolvedValue(mockUser);
+            userRepository.generateAuthToken.mockReturnValue('mock.jwt.token');
 
             const response = await request(app)
                 .post('/register')
@@ -72,7 +72,7 @@ describe('Auth Controller (JSON Storage)', () => {
             expect(response.body.success).toBe(true);
             expect(response.body.token).toBe('mock.jwt.token');
             expect(response.body.data.user).toEqual(mockUser);
-            expect(userStore.create).toHaveBeenCalledWith({
+            expect(userRepository.create).toHaveBeenCalledWith({
                 username: userData.username,
                 email: userData.email,
                 password: userData.password,
@@ -120,7 +120,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 password: 'password123'
             };
 
-            userStore.create.mockRejectedValue(new Error('User already exists with this email or username'));
+            userRepository.create.mockRejectedValue(new Error('User already exists with this email or username'));
 
             const response = await request(app)
                 .post('/register')
@@ -148,10 +148,10 @@ describe('Auth Controller (JSON Storage)', () => {
                 isActive: true
             };
 
-            userStore.findByEmail.mockResolvedValue(mockUser);
-            userStore.comparePassword.mockResolvedValue(true);
-            userStore.updateLastLogin.mockResolvedValue();
-            userStore.generateAuthToken.mockReturnValue('mock.jwt.token');
+            userRepository.findByEmail.mockResolvedValue(mockUser);
+            userRepository.comparePassword.mockResolvedValue(true);
+            userRepository.updateLastLogin.mockResolvedValue();
+            userRepository.generateAuthToken.mockReturnValue('mock.jwt.token');
 
             const response = await request(app)
                 .post('/login')
@@ -161,9 +161,9 @@ describe('Auth Controller (JSON Storage)', () => {
             expect(response.body.success).toBe(true);
             expect(response.body.token).toBe('mock.jwt.token');
             expect(response.body.data.user.password).toBeUndefined();
-            expect(userStore.findByEmail).toHaveBeenCalledWith(loginData.email);
-            expect(userStore.comparePassword).toHaveBeenCalledWith(mockUser, loginData.password);
-            expect(userStore.updateLastLogin).toHaveBeenCalledWith(mockUser.id);
+            expect(userRepository.findByEmail).toHaveBeenCalledWith(loginData.email);
+            expect(userRepository.comparePassword).toHaveBeenCalledWith(mockUser, loginData.password);
+            expect(userRepository.updateLastLogin).toHaveBeenCalledWith(mockUser.id);
         });
 
         test('should validate required fields', async() => {
@@ -177,7 +177,7 @@ describe('Auth Controller (JSON Storage)', () => {
         });
 
         test('should handle non-existent user', async() => {
-            userStore.findByEmail.mockResolvedValue(null);
+            userRepository.findByEmail.mockResolvedValue(null);
 
             const response = await request(app)
                 .post('/login')
@@ -196,8 +196,8 @@ describe('Auth Controller (JSON Storage)', () => {
                 isActive: true
             };
 
-            userStore.findByEmail.mockResolvedValue(mockUser);
-            userStore.comparePassword.mockResolvedValue(false);
+            userRepository.findByEmail.mockResolvedValue(mockUser);
+            userRepository.comparePassword.mockResolvedValue(false);
 
             const response = await request(app)
                 .post('/login')
@@ -216,8 +216,8 @@ describe('Auth Controller (JSON Storage)', () => {
                 isActive: false
             };
 
-            userStore.findByEmail.mockResolvedValue(mockUser);
-            userStore.comparePassword.mockResolvedValue(true);
+            userRepository.findByEmail.mockResolvedValue(mockUser);
+            userRepository.comparePassword.mockResolvedValue(true);
 
             const response = await request(app)
                 .post('/login')
@@ -252,7 +252,7 @@ describe('Auth Controller (JSON Storage)', () => {
 
             // Mock authenticated request
             const req = { user: { id: 'testuser' } };
-            userStore.findById.mockResolvedValue(mockUser);
+            userRepository.findById.mockResolvedValue(mockUser);
 
             // Create custom app for this test with req.user
             const testApp = express();
@@ -273,7 +273,7 @@ describe('Auth Controller (JSON Storage)', () => {
         });
 
         test('should handle user not found', async() => {
-            userStore.findById.mockResolvedValue(null);
+            userRepository.findById.mockResolvedValue(null);
 
             const testApp = express();
             testApp.use(express.json());
@@ -306,7 +306,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 username: 'testuser'
             };
 
-            userStore.updateById.mockResolvedValue(updatedUser);
+            userRepository.updateById.mockResolvedValue(updatedUser);
 
             const testApp = express();
             testApp.use(express.json());
@@ -323,11 +323,11 @@ describe('Auth Controller (JSON Storage)', () => {
 
             expect(response.body.success).toBe(true);
             expect(response.body.data).toEqual(updatedUser);
-            expect(userStore.updateById).toHaveBeenCalledWith('testuser', updateData);
+            expect(userRepository.updateById).toHaveBeenCalledWith('testuser', updateData);
         });
 
         test('should handle duplicate email error', async() => {
-            userStore.updateById.mockRejectedValue(new Error('Email already exists'));
+            userRepository.updateById.mockRejectedValue(new Error('Email already exists'));
 
             const testApp = express();
             testApp.use(express.json());
@@ -359,10 +359,10 @@ describe('Auth Controller (JSON Storage)', () => {
                 password: 'hashedoldpassword'
             };
 
-            userStore.findById.mockResolvedValue(mockUser);
-            userStore.comparePassword.mockResolvedValue(true);
-            userStore.updateById.mockResolvedValue({...mockUser, password: 'hashednewpassword' });
-            userStore.generateAuthToken.mockReturnValue('new.jwt.token');
+            userRepository.findById.mockResolvedValue(mockUser);
+            userRepository.comparePassword.mockResolvedValue(true);
+            userRepository.updateById.mockResolvedValue({...mockUser, password: 'hashednewpassword' });
+            userRepository.generateAuthToken.mockReturnValue('new.jwt.token');
 
             const testApp = express();
             testApp.use(express.json());
@@ -379,8 +379,8 @@ describe('Auth Controller (JSON Storage)', () => {
 
             expect(response.body.success).toBe(true);
             expect(response.body.token).toBe('new.jwt.token');
-            expect(userStore.comparePassword).toHaveBeenCalledWith(mockUser, passwordData.currentPassword);
-            expect(userStore.updateById).toHaveBeenCalledWith('testuser', { password: passwordData.newPassword });
+            expect(userRepository.comparePassword).toHaveBeenCalledWith(mockUser, passwordData.currentPassword);
+            expect(userRepository.updateById).toHaveBeenCalledWith('testuser', { password: passwordData.newPassword });
         });
 
         test('should validate required fields', async() => {
@@ -424,8 +424,8 @@ describe('Auth Controller (JSON Storage)', () => {
 
         test('should handle incorrect current password', async() => {
             const mockUser = { id: 'testuser', password: 'hashedpassword' };
-            userStore.findById.mockResolvedValue(mockUser);
-            userStore.comparePassword.mockResolvedValue(false);
+            userRepository.findById.mockResolvedValue(mockUser);
+            userRepository.comparePassword.mockResolvedValue(false);
 
             const testApp = express();
             testApp.use(express.json());
@@ -455,7 +455,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 { id: 'user2', username: 'user2', role: 'operator' }
             ];
 
-            userStore.getAllUsers.mockResolvedValue(mockUsers);
+            userRepository.getAllUsers.mockResolvedValue(mockUsers);
 
             const testApp = express();
             testApp.use(express.json());
@@ -495,7 +495,7 @@ describe('Auth Controller (JSON Storage)', () => {
     describe('POST /backup', () => {
         test('should create backup for admin', async() => {
             const backupFile = '/path/to/backup.json';
-            userStore.createBackup.mockResolvedValue(backupFile);
+            userRepository.createBackup.mockResolvedValue(backupFile);
 
             const testApp = express();
             testApp.use(express.json());
@@ -540,7 +540,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 storageType: 'json-file'
             };
 
-            userStore.healthCheck.mockResolvedValue(healthData);
+            userRepository.healthCheck.mockResolvedValue(healthData);
 
             const response = await request(app)
                 .get('/info')
@@ -556,7 +556,7 @@ describe('Auth Controller (JSON Storage)', () => {
             const originalEnv = process.env.NODE_ENV;
             process.env.NODE_ENV = 'development';
 
-            userStore.healthCheck.mockResolvedValue({ status: 'healthy' });
+            userRepository.healthCheck.mockResolvedValue({ status: 'healthy' });
 
             const response = await request(app)
                 .get('/info')
@@ -572,7 +572,7 @@ describe('Auth Controller (JSON Storage)', () => {
             const originalEnv = process.env.NODE_ENV;
             process.env.NODE_ENV = 'production';
 
-            userStore.healthCheck.mockResolvedValue({ status: 'healthy' });
+            userRepository.healthCheck.mockResolvedValue({ status: 'healthy' });
 
             const response = await request(app)
                 .get('/info')
