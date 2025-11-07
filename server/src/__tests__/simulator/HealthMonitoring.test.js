@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { SimulationManager } from '../../simulator/SimulationManager.js';
+import { SimulationManager } from '../simulator/SimulationManager.js';
 
 describe('Health Monitoring & Batch Operations', () => {
     let simulationManager;

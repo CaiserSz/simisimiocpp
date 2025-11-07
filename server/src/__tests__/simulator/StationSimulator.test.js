@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { StationSimulator } from '../../simulator/StationSimulator.js';
+import { StationSimulator } from '../simulator/StationSimulator.js';
 
 /**
  * StationSimulator Test Suite
