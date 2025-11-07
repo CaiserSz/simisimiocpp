@@ -245,7 +245,8 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(200);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.message).toContain('Successfully logged out');
+            const message = (response.body.data && response.body.data.message) || response.body.message || '';
+            expect(message).toContain('Successfully logged out');
         });
     });
 
@@ -479,7 +480,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(200);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.count).toBe(2);
+            expect(response.body.meta.count).toBe(2);
             expect(response.body.data).toEqual(mockUsers);
         });
 
@@ -497,7 +498,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(403);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Admin role required');
+            expect(response.body.error.message || response.body.error).toContain('Admin role required');
         });
     });
 
@@ -519,8 +520,8 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(200);
 
             expect(response.body.success).toBe(true);
-            expect(response.body.backupFile).toBe(backupFile);
-            expect(response.body.message).toContain('Backup created successfully');
+            expect(response.body.data.backupFile).toBe(backupFile);
+            expect(response.body.data.message).toContain('Backup created successfully');
         });
 
         test('should deny access to non-admin', async() => {
@@ -537,7 +538,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 .expect(403);
 
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toContain('Admin role required');
+            expect(response.body.error.message || response.body.error).toContain('Admin role required');
         });
     });
 
