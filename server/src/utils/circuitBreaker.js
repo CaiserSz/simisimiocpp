@@ -13,20 +13,20 @@ import logger from '../utils/logger.js';
 export class CircuitBreaker extends EventEmitter {
     constructor(options = {}) {
         super();
-        
+
         this.name = options.name || 'circuit-breaker';
         this.failureThreshold = options.failureThreshold || 5; // Open after 5 failures
         this.successThreshold = options.successThreshold || 2; // Close after 2 successes
         this.timeout = options.timeout || 60000; // 60 seconds timeout
         this.resetTimeout = options.resetTimeout || 30000; // 30 seconds before half-open
-        
+
         // State tracking
         this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
         this.failureCount = 0;
         this.successCount = 0;
         this.lastFailureTime = null;
         this.nextAttemptTime = null;
-        
+
         // Statistics
         this.stats = {
             totalRequests: 0,
@@ -42,7 +42,7 @@ export class CircuitBreaker extends EventEmitter {
      */
     async execute(fn, ...args) {
         this.stats.totalRequests++;
-        
+
         // Check if circuit is open
         if (this.state === 'OPEN') {
             if (Date.now() < this.nextAttemptTime) {
@@ -55,20 +55,20 @@ export class CircuitBreaker extends EventEmitter {
                 });
                 throw new Error(`Circuit breaker ${this.name} is OPEN. Service unavailable.`);
             }
-            
+
             // Transition to HALF_OPEN
             this.transitionToHalfOpen();
         }
-        
+
         // Execute the function
         try {
             const result = await Promise.race([
                 fn(...args),
-                new Promise((_, reject) => 
+                new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Operation timeout')), this.timeout)
                 )
             ]);
-            
+
             this.onSuccess();
             return result;
         } catch (error) {
@@ -82,10 +82,10 @@ export class CircuitBreaker extends EventEmitter {
      */
     onSuccess() {
         this.stats.totalSuccesses++;
-        
+
         if (this.state === 'HALF_OPEN') {
             this.successCount++;
-            
+
             if (this.successCount >= this.successThreshold) {
                 this.transitionToClosed();
             }
@@ -102,14 +102,14 @@ export class CircuitBreaker extends EventEmitter {
         this.stats.totalFailures++;
         this.failureCount++;
         this.lastFailureTime = Date.now();
-        
+
         this.emit('failure', {
             name: this.name,
             error: error.message,
             failureCount: this.failureCount,
             state: this.state
         });
-        
+
         if (this.state === 'HALF_OPEN') {
             // Failed during half-open, go back to open
             this.transitionToOpen();
@@ -127,16 +127,16 @@ export class CircuitBreaker extends EventEmitter {
         this.state = 'OPEN';
         this.nextAttemptTime = Date.now() + this.resetTimeout;
         this.successCount = 0;
-        
+
         this.stats.stateChanges.push({
             from: previousState,
             to: 'OPEN',
             timestamp: new Date().toISOString(),
             reason: `Failure threshold reached (${this.failureCount} failures)`
         });
-        
+
         logger.warn(`🔴 Circuit breaker ${this.name} opened after ${this.failureCount} failures`);
-        
+
         this.emit('open', {
             name: this.name,
             failureCount: this.failureCount,
@@ -152,16 +152,16 @@ export class CircuitBreaker extends EventEmitter {
         this.state = 'HALF_OPEN';
         this.successCount = 0;
         this.failureCount = 0;
-        
+
         this.stats.stateChanges.push({
             from: previousState,
             to: 'HALF_OPEN',
             timestamp: new Date().toISOString(),
             reason: 'Testing if service recovered'
         });
-        
+
         logger.info(`🟡 Circuit breaker ${this.name} half-open - testing recovery`);
-        
+
         this.emit('halfOpen', {
             name: this.name
         });
@@ -177,16 +177,16 @@ export class CircuitBreaker extends EventEmitter {
         this.successCount = 0;
         this.lastFailureTime = null;
         this.nextAttemptTime = null;
-        
+
         this.stats.stateChanges.push({
             from: previousState,
             to: 'CLOSED',
             timestamp: new Date().toISOString(),
             reason: 'Service recovered'
         });
-        
+
         logger.info(`🟢 Circuit breaker ${this.name} closed - service recovered`);
-        
+
         this.emit('closed', {
             name: this.name
         });
@@ -209,7 +209,7 @@ export class CircuitBreaker extends EventEmitter {
             successCount: this.successCount,
             lastFailureTime: this.lastFailureTime,
             nextAttemptTime: this.nextAttemptTime,
-            stats: { ...this.stats }
+            stats: {...this.stats }
         };
     }
 
@@ -283,4 +283,3 @@ class CircuitBreakerManager {
 // Export singleton instance
 export const circuitBreakerManager = new CircuitBreakerManager();
 export default circuitBreakerManager;
-
