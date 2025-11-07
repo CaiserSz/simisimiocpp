@@ -1,259 +1,586 @@
-import request from 'supertest';
+import { jest } from '@jest/globals';
 import express from 'express';
-import jwt from 'jsonwebtoken';
-import User from '../../models/user.model.js';
-import { register, login, logout, getMe, forgotPassword, resetPassword } from '../../controllers/auth.controller.js';
-import config from '../../config/config.js';
+import request from 'supertest';
+import * as authController from '../../controllers/auth.controller.js';
+import userStore from '../../services/SimpleUserStore.js';
 
-// Create test app
 const app = express();
 app.use(express.json());
 
-// Mount auth routes
-app.post('/register', register);
-app.post('/login', login);
-app.get('/logout', logout);
-app.get('/me', getMe);
-app.post('/forgot-password', forgotPassword);
-app.put('/reset-password/:resettoken', resetPassword);
+// Mock userStore methods
+jest.mock('../../services/SimpleUserStore.js', () => ({
+    __esModule: true,
+    default: {
+        initialize: jest.fn(),
+        create: jest.fn(),
+        findByEmail: jest.fn(),
+        findById: jest.fn(),
+        updateById: jest.fn(),
+        updateLastLogin: jest.fn(),
+        comparePassword: jest.fn(),
+        generateAuthToken: jest.fn(),
+        getAllUsers: jest.fn(),
+        createBackup: jest.fn(),
+        healthCheck: jest.fn()
+    }
+}));
 
-describe('Auth Controller', () => {
-  describe('POST /register', () => {
-    test('should register a new user successfully', async () => {
-      const userData = global.testUtils.createTestUser();
-      
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(201);
+// Setup routes
+app.post('/register', authController.register);
+app.post('/login', authController.login);
+app.get('/logout', authController.logout);
+app.get('/me', authController.getMe);
+app.put('/updatedetails', authController.updateDetails);
+app.put('/updatepassword', authController.updatePassword);
+app.get('/users', authController.getAllUsers);
+app.post('/backup', authController.createBackup);
+app.get('/info', authController.getSystemInfo);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
-      expect(response.body.data.user).toBeDefined();
-      expect(response.body.data.user.password).toBeUndefined();
-      
-      // Verify user was created in database
-      const user = await User.findOne({ email: userData.email });
-      expect(user).toBeTruthy();
-      expect(user.username).toBe(userData.username);
+describe('Auth Controller (JSON Storage)', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
     });
 
-    test('should not register user with existing email', async () => {
-      const userData = global.testUtils.createTestUser();
-      
-      // Create user first
-      await User.create(userData);
-      
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(400);
+    describe('POST /register', () => {
+        test('should register new user successfully', async() => {
+            const userData = {
+                username: 'testuser',
+                email: 'test@example.com',
+                password: 'password123',
+                firstName: 'Test',
+                lastName: 'User'
+            };
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('already exists');
+            const mockUser = {
+                id: 'testuser',
+                username: 'testuser',
+                email: 'test@example.com',
+                role: 'user',
+                firstName: 'Test',
+                lastName: 'User',
+                createdAt: '2025-11-01T12:00:00.000Z'
+            };
+
+            userStore.create.mockResolvedValue(mockUser);
+            userStore.generateAuthToken.mockReturnValue('mock.jwt.token');
+
+            const response = await request(app)
+                .post('/register')
+                .send(userData)
+                .expect(201);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.token).toBe('mock.jwt.token');
+            expect(response.body.data.user).toEqual(mockUser);
+            expect(userStore.create).toHaveBeenCalledWith({
+                username: userData.username,
+                email: userData.email,
+                password: userData.password,
+                role: 'user',
+                firstName: userData.firstName,
+                lastName: userData.lastName
+            });
+        });
+
+        test('should validate required fields', async() => {
+            const invalidData = {
+                email: 'test@example.com'
+                    // Missing username and password
+            };
+
+            const response = await request(app)
+                .post('/register')
+                .send(invalidData)
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Username, email and password are required');
+        });
+
+        test('should validate password length', async() => {
+            const userData = {
+                username: 'testuser',
+                email: 'test@example.com',
+                password: '123' // Too short
+            };
+
+            const response = await request(app)
+                .post('/register')
+                .send(userData)
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Password must be at least 6 characters');
+        });
+
+        test('should handle duplicate user error', async() => {
+            const userData = {
+                username: 'existing',
+                email: 'existing@example.com',
+                password: 'password123'
+            };
+
+            userStore.create.mockRejectedValue(new Error('User already exists with this email or username'));
+
+            const response = await request(app)
+                .post('/register')
+                .send(userData)
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('already exists');
+        });
     });
 
-    test('should not register user with invalid data', async () => {
-      const invalidData = {
-        username: 'ab', // Too short
-        email: 'invalid-email',
-        password: '123' // Too weak
-      };
-      
-      const response = await request(app)
-        .post('/register')
-        .send(invalidData)
-        .expect(400);
+    describe('POST /login', () => {
+        test('should login user successfully', async() => {
+            const loginData = {
+                email: 'test@example.com',
+                password: 'password123'
+            };
 
-      expect(response.body.success).toBe(false);
-    });
-  });
+            const mockUser = {
+                id: 'testuser',
+                username: 'testuser',
+                email: 'test@example.com',
+                password: 'hashedpassword',
+                role: 'user',
+                isActive: true
+            };
 
-  describe('POST /login', () => {
-    let testUser;
+            userStore.findByEmail.mockResolvedValue(mockUser);
+            userStore.comparePassword.mockResolvedValue(true);
+            userStore.updateLastLogin.mockResolvedValue();
+            userStore.generateAuthToken.mockReturnValue('mock.jwt.token');
 
-    beforeEach(async () => {
-      const userData = global.testUtils.createTestUser();
-      testUser = await User.create(userData);
-    });
+            const response = await request(app)
+                .post('/login')
+                .send(loginData)
+                .expect(200);
 
-    test('should login with correct credentials', async () => {
-      const response = await request(app)
-        .post('/login')
-        .send({
-          email: testUser.email,
-          password: 'TestPassword123!'
-        })
-        .expect(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.token).toBe('mock.jwt.token');
+            expect(response.body.data.user.password).toBeUndefined();
+            expect(userStore.findByEmail).toHaveBeenCalledWith(loginData.email);
+            expect(userStore.comparePassword).toHaveBeenCalledWith(mockUser, loginData.password);
+            expect(userStore.updateLastLogin).toHaveBeenCalledWith(mockUser.id);
+        });
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
-      
-      // Verify JWT token
-      const decoded = jwt.verify(response.body.token, config.security.jwtSecret);
-      expect(decoded.id).toBe(testUser._id.toString());
-    });
+        test('should validate required fields', async() => {
+            const response = await request(app)
+                .post('/login')
+                .send({ email: 'test@example.com' }) // Missing password
+                .expect(400);
 
-    test('should not login with incorrect password', async () => {
-      const response = await request(app)
-        .post('/login')
-        .send({
-          email: testUser.email,
-          password: 'WrongPassword123!'
-        })
-        .expect(401);
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Please provide email and password');
+        });
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Incorrect');
-    });
+        test('should handle non-existent user', async() => {
+            userStore.findByEmail.mockResolvedValue(null);
 
-    test('should not login with non-existent user', async () => {
-      const response = await request(app)
-        .post('/login')
-        .send({
-          email: 'nonexistent@example.com',
-          password: 'TestPassword123!'
-        })
-        .expect(401);
+            const response = await request(app)
+                .post('/login')
+                .send({ email: 'nonexistent@example.com', password: 'password123' })
+                .expect(401);
 
-      expect(response.body.success).toBe(false);
-    });
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Incorrect email or password');
+        });
 
-    test('should not login inactive user', async () => {
-      testUser.isActive = false;
-      await testUser.save();
+        test('should handle incorrect password', async() => {
+            const mockUser = {
+                id: 'testuser',
+                email: 'test@example.com',
+                password: 'hashedpassword',
+                isActive: true
+            };
 
-      const response = await request(app)
-        .post('/login')
-        .send({
-          email: testUser.email,
-          password: 'TestPassword123!'
-        })
-        .expect(403);
+            userStore.findByEmail.mockResolvedValue(mockUser);
+            userStore.comparePassword.mockResolvedValue(false);
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('deactivated');
-    });
+            const response = await request(app)
+                .post('/login')
+                .send({ email: 'test@example.com', password: 'wrongpassword' })
+                .expect(401);
 
-    test('should update last login timestamp', async () => {
-      const oldLastLogin = testUser.lastLogin;
-      
-      await request(app)
-        .post('/login')
-        .send({
-          email: testUser.email,
-          password: 'TestPassword123!'
-        })
-        .expect(200);
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Incorrect email or password');
+        });
 
-      const updatedUser = await User.findById(testUser._id);
-      expect(updatedUser.lastLogin).toBeDefined();
-      if (oldLastLogin) {
-        expect(updatedUser.lastLogin.getTime()).toBeGreaterThan(oldLastLogin.getTime());
-      }
-    });
-  });
+        test('should handle inactive user', async() => {
+            const mockUser = {
+                id: 'testuser',
+                email: 'test@example.com',
+                password: 'hashedpassword',
+                isActive: false
+            };
 
-  describe('GET /logout', () => {
-    test('should logout user', async () => {
-      const response = await request(app)
-        .get('/logout')
-        .expect(200);
+            userStore.findByEmail.mockResolvedValue(mockUser);
+            userStore.comparePassword.mockResolvedValue(true);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('logged out');
-    });
-  });
+            const response = await request(app)
+                .post('/login')
+                .send({ email: 'test@example.com', password: 'password123' })
+                .expect(403);
 
-  describe('POST /forgot-password', () => {
-    let testUser;
-
-    beforeEach(async () => {
-      const userData = global.testUtils.createTestUser();
-      testUser = await User.create(userData);
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Account has been deactivated');
+        });
     });
 
-    test('should generate password reset token', async () => {
-      const response = await request(app)
-        .post('/forgot-password')
-        .send({ email: testUser.email })
-        .expect(200);
+    describe('GET /logout', () => {
+        test('should logout user successfully', async() => {
+            const response = await request(app)
+                .get('/logout')
+                .expect(200);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('Token sent');
-
-      // Verify reset token was set
-      const updatedUser = await User.findById(testUser._id);
-      expect(updatedUser.resetPasswordToken).toBeDefined();
-      expect(updatedUser.resetPasswordExpire).toBeDefined();
+            expect(response.body.success).toBe(true);
+            expect(response.body.message).toContain('Successfully logged out');
+        });
     });
 
-    test('should not generate token for non-existent user', async () => {
-      const response = await request(app)
-        .post('/forgot-password')
-        .send({ email: 'nonexistent@example.com' })
-        .expect(404);
+    describe('GET /me', () => {
+        test('should get current user successfully', async() => {
+            const mockUser = {
+                id: 'testuser',
+                username: 'testuser',
+                email: 'test@example.com',
+                role: 'user',
+                password: 'hashedpassword'
+            };
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('No user found');
-    });
-  });
+            // Mock authenticated request
+            const req = { user: { id: 'testuser' } };
+            userStore.findById.mockResolvedValue(mockUser);
 
-  describe('PUT /reset-password/:resettoken', () => {
-    let testUser, resetToken;
+            // Create custom app for this test with req.user
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.get('/me', authController.getMe);
 
-    beforeEach(async () => {
-      const userData = global.testUtils.createTestUser();
-      testUser = await User.create(userData);
-      
-      // Generate reset token
-      resetToken = testUser.generatePasswordResetToken();
-      await testUser.save();
-    });
+            const response = await request(testApp)
+                .get('/me')
+                .expect(200);
 
-    test('should reset password with valid token', async () => {
-      const newPassword = 'NewPassword123!';
-      
-      const response = await request(app)
-        .put(`/reset-password/${resetToken}`)
-        .send({ password: newPassword })
-        .expect(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.password).toBeUndefined();
+            expect(response.body.data.username).toBe('testuser');
+        });
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
+        test('should handle user not found', async() => {
+            userStore.findById.mockResolvedValue(null);
 
-      // Verify password was changed
-      const updatedUser = await User.findById(testUser._id);
-      const isMatch = await updatedUser.comparePassword(newPassword);
-      expect(isMatch).toBe(true);
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'nonexistent' };
+                next();
+            });
+            testApp.get('/me', authController.getMe);
 
-      // Verify reset token was cleared
-      expect(updatedUser.resetPasswordToken).toBeUndefined();
-      expect(updatedUser.resetPasswordExpire).toBeUndefined();
-    });
+            const response = await request(testApp)
+                .get('/me')
+                .expect(404);
 
-    test('should not reset password with invalid token', async () => {
-      const response = await request(app)
-        .put('/reset-password/invalid-token')
-        .send({ password: 'NewPassword123!' })
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Invalid token');
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('User not found');
+        });
     });
 
-    test('should not reset password with expired token', async () => {
-      // Set token to expired
-      testUser.resetPasswordExpire = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
-      await testUser.save();
+    describe('PUT /updatedetails', () => {
+        test('should update user details successfully', async() => {
+            const updateData = {
+                firstName: 'Updated',
+                lastName: 'Name',
+                email: 'updated@example.com'
+            };
 
-      const response = await request(app)
-        .put(`/reset-password/${resetToken}`)
-        .send({ password: 'NewPassword123!' })
-        .expect(400);
+            const updatedUser = {
+                id: 'testuser',
+                ...updateData,
+                username: 'testuser'
+            };
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('expired');
+            userStore.updateById.mockResolvedValue(updatedUser);
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatedetails', authController.updateDetails);
+
+            const response = await request(testApp)
+                .put('/updatedetails')
+                .send(updateData)
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data).toEqual(updatedUser);
+            expect(userStore.updateById).toHaveBeenCalledWith('testuser', updateData);
+        });
+
+        test('should handle duplicate email error', async() => {
+            userStore.updateById.mockRejectedValue(new Error('Email already exists'));
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatedetails', authController.updateDetails);
+
+            const response = await request(testApp)
+                .put('/updatedetails')
+                .send({ email: 'existing@example.com' })
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Email already exists');
+        });
     });
-  });
+
+    describe('PUT /updatepassword', () => {
+        test('should update password successfully', async() => {
+            const passwordData = {
+                currentPassword: 'oldpassword',
+                newPassword: 'newpassword123'
+            };
+
+            const mockUser = {
+                id: 'testuser',
+                password: 'hashedoldpassword'
+            };
+
+            userStore.findById.mockResolvedValue(mockUser);
+            userStore.comparePassword.mockResolvedValue(true);
+            userStore.updateById.mockResolvedValue({...mockUser, password: 'hashednewpassword' });
+            userStore.generateAuthToken.mockReturnValue('new.jwt.token');
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatepassword', authController.updatePassword);
+
+            const response = await request(testApp)
+                .put('/updatepassword')
+                .send(passwordData)
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.token).toBe('new.jwt.token');
+            expect(userStore.comparePassword).toHaveBeenCalledWith(mockUser, passwordData.currentPassword);
+            expect(userStore.updateById).toHaveBeenCalledWith('testuser', { password: passwordData.newPassword });
+        });
+
+        test('should validate required fields', async() => {
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatepassword', authController.updatePassword);
+
+            const response = await request(testApp)
+                .put('/updatepassword')
+                .send({ currentPassword: 'oldpassword' }) // Missing newPassword
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Current password and new password are required');
+        });
+
+        test('should validate password length', async() => {
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatepassword', authController.updatePassword);
+
+            const response = await request(testApp)
+                .put('/updatepassword')
+                .send({
+                    currentPassword: 'oldpassword',
+                    newPassword: '123' // Too short
+                })
+                .expect(400);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('New password must be at least 6 characters');
+        });
+
+        test('should handle incorrect current password', async() => {
+            const mockUser = { id: 'testuser', password: 'hashedpassword' };
+            userStore.findById.mockResolvedValue(mockUser);
+            userStore.comparePassword.mockResolvedValue(false);
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'testuser' };
+                next();
+            });
+            testApp.put('/updatepassword', authController.updatePassword);
+
+            const response = await request(testApp)
+                .put('/updatepassword')
+                .send({
+                    currentPassword: 'wrongpassword',
+                    newPassword: 'newpassword123'
+                })
+                .expect(401);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Current password is incorrect');
+        });
+    });
+
+    describe('GET /users', () => {
+        test('should get all users for admin', async() => {
+            const mockUsers = [
+                { id: 'user1', username: 'user1', role: 'user' },
+                { id: 'user2', username: 'user2', role: 'operator' }
+            ];
+
+            userStore.getAllUsers.mockResolvedValue(mockUsers);
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'admin', role: 'admin' };
+                next();
+            });
+            testApp.get('/users', authController.getAllUsers);
+
+            const response = await request(testApp)
+                .get('/users')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.count).toBe(2);
+            expect(response.body.data).toEqual(mockUsers);
+        });
+
+        test('should deny access to non-admin', async() => {
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'user', role: 'user' };
+                next();
+            });
+            testApp.get('/users', authController.getAllUsers);
+
+            const response = await request(testApp)
+                .get('/users')
+                .expect(403);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Admin role required');
+        });
+    });
+
+    describe('POST /backup', () => {
+        test('should create backup for admin', async() => {
+            const backupFile = '/path/to/backup.json';
+            userStore.createBackup.mockResolvedValue(backupFile);
+
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'admin', role: 'admin' };
+                next();
+            });
+            testApp.post('/backup', authController.createBackup);
+
+            const response = await request(testApp)
+                .post('/backup')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.backupFile).toBe(backupFile);
+            expect(response.body.message).toContain('Backup created successfully');
+        });
+
+        test('should deny access to non-admin', async() => {
+            const testApp = express();
+            testApp.use(express.json());
+            testApp.use((req, res, next) => {
+                req.user = { id: 'user', role: 'user' };
+                next();
+            });
+            testApp.post('/backup', authController.createBackup);
+
+            const response = await request(testApp)
+                .post('/backup')
+                .expect(403);
+
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Admin role required');
+        });
+    });
+
+    describe('GET /info', () => {
+        test('should get system info', async() => {
+            const healthData = {
+                status: 'healthy',
+                userCount: 3,
+                storageType: 'json-file'
+            };
+
+            userStore.healthCheck.mockResolvedValue(healthData);
+
+            const response = await request(app)
+                .get('/info')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.systemType).toBe('EV Station Simulator');
+            expect(response.body.data.userStorage).toBe('JSON-based (lightweight)');
+            expect(response.body.data.status).toBe('healthy');
+        });
+
+        test('should include default credentials in development', async() => {
+            const originalEnv = process.env.NODE_ENV;
+            process.env.NODE_ENV = 'development';
+
+            userStore.healthCheck.mockResolvedValue({ status: 'healthy' });
+
+            const response = await request(app)
+                .get('/info')
+                .expect(200);
+
+            expect(response.body.data.defaultCredentials).toBeDefined();
+            expect(response.body.data.defaultCredentials.admin).toContain('admin@simulator.local');
+
+            process.env.NODE_ENV = originalEnv;
+        });
+
+        test('should hide default credentials in production', async() => {
+            const originalEnv = process.env.NODE_ENV;
+            process.env.NODE_ENV = 'production';
+
+            userStore.healthCheck.mockResolvedValue({ status: 'healthy' });
+
+            const response = await request(app)
+                .get('/info')
+                .expect(200);
+
+            expect(response.body.data.defaultCredentials).toBe('hidden');
+
+            process.env.NODE_ENV = originalEnv;
+        });
+    });
 });

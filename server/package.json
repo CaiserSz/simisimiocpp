@@ -2,15 +2,15 @@
     "name": "charging-simulator-server",
     "version": "1.0.0",
     "description": "AC Charging Station Simulator with OCPP 2.0.1 support",
-    "main": "src/index.js",
+    "main": "src/app.js",
     "type": "module",
     "engines": {
         "node": ">=20.0.0",
         "npm": ">=9.0.0"
     },
     "scripts": {
-        "start": "node --experimental-modules src/index.js",
-        "dev": "nodemon --experimental-modules src/index.js",
+        "start": "node --experimental-modules src/app.js",
+        "dev": "nodemon --experimental-modules src/app.js",
         "test": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --detectOpenHandles",
         "test:unit": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=__tests__/controllers --runInBand",
         "test:integration": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=__tests__/integration --runInBand",
@@ -68,7 +68,7 @@
         "collectCoverageFrom": [
             "src/**/*.js",
             "!src/__tests__/**",
-            "!src/index.js",
+            "!src/app.js",
             "!src/**/*.test.js"
         ],
         "coverageDirectory": "coverage",
@@ -78,7 +78,7 @@
             "html"
         ],
         "setupFilesAfterEnv": [
-            "<rootDir>/src/__tests__/setup.updated.js"
+            "<rootDir>/src/__tests__/setup.js"
         ],
         "moduleNameMapper": {
             "^(\\.{1,2}/.*)\\.js$": "$1"

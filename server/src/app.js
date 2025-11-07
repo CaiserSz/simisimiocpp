@@ -11,11 +11,11 @@ import { fileURLToPath } from 'url';
 
 // Services and utilities
 import config from './config/config.js';
-import { apiVersionMiddleware, setupApiVersioning } from './middleware/apiVersion.middleware.js';
-import { createCorsOptions } from './middleware/cors.middleware.js';
-import metricsCollector from './middleware/metrics.middleware.js';
-import { setupRequestMiddleware } from './middleware/request.middleware.js';
-import { setupSecurity } from './middleware/security.middleware.js';
+import { apiVersionMiddleware, setupApiVersioning } from './middleware/apiVersion.js';
+import { createCorsOptions } from './middleware/cors.js';
+import metricsCollector from './middleware/metrics.js';
+import { setupRequestMiddleware } from './middleware/request.js';
+import { setupSecurity } from './middleware/security.js';
 import WebSocketServer from './services/WebSocketServer.js';
 import DatabaseManager from './utils/database.js';
 import logger from './utils/logger.js';
@@ -32,8 +32,8 @@ import { initializeSentry } from './utils/sentry.js';
 
 // Import routes
 import apiRouter from './routes/api/index.js';
-import dashboardRouter from './routes/dashboard.routes.js';
-import simulatorRouter from './routes/simulator.routes.js';
+import dashboardRouter from './routes/dashboard.js';
+import simulatorRouter from './routes/simulator.js';
 
 // Import SimulationManager for graceful shutdown
 import { simulationManager } from './controllers/simulator.controller.js';
@@ -208,7 +208,7 @@ import ('./config/swagger.js').then(async(swaggerModule) => {
 // Conditional auth routes (only when authentication enabled)
 if (config.security.enableAuth) {
     logger.info('🔒 Authentication enabled - mounting auth routes');
-    import ('./routes/auth.routes.js').then(({ default: authRoutes }) => {
+    import ('./routes/auth.js').then(({ default: authRoutes }) => {
         app.use('/api/v1/auth', apiVersionMiddleware, authRoutes);
         logger.info('✅ Auth routes mounted');
     }).catch(err => {

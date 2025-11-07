@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
-import metricsCollector from '../middleware/metrics.middleware.js';
+import metricsCollector from '../middleware/metrics.js';
 
 /**
  * Enterprise Cache Manager with Redis

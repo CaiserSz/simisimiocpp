@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { param, query } from 'express-validator';
 import * as dashboardController from '../controllers/dashboard.controller.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = Router();
 

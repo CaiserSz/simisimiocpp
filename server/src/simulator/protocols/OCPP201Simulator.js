@@ -1,5 +1,5 @@
 import logger from '../../utils/logger.js';
-import metricsCollector from '../../middleware/metrics.middleware.js';
+import metricsCollector from '../../middleware/metrics.js';
 import { BaseOCPPSimulator } from './BaseOCPPSimulator.js';
 
 /**
