@@ -94,7 +94,7 @@ export class MockCsmsServer {
         });
 
         this.wss.on('connection', (socket, request) => {
-            const stationId = request.url ? .split('/').pop() || 'unknown-station';
+            const stationId = request.url?.split('/').pop() || 'unknown-station';
             logger.debug(`🔌 Mock CSMS: station connected (${stationId})`);
 
             const connectionContext = {
@@ -312,7 +312,7 @@ export class MockCsmsServer {
 
         await new Promise((resolve) => {
             const timer = setTimeout(resolve, delay);
-            timer.unref ? .();
+            timer.unref?.();
         });
     }
 
@@ -411,7 +411,7 @@ export class MockCsmsServer {
      * Get nested value from object using dot notation
      */
     getNestedValue(obj, path) {
-        return path.split('.').reduce((current, key) => current ? .[key], obj);
+        return path.split('.').reduce((current, key) => current?.[key], obj);
     }
 
     async handleCall(context, { messageId, action, payload }) {
@@ -464,7 +464,7 @@ export class MockCsmsServer {
                     const remoteStartTimer = setTimeout(() => {
                         this.sendRemoteStart(socket);
                     }, 500);
-                    remoteStartTimer.unref ? .();
+                    remoteStartTimer.unref?.();
                 }
                 break;
             case 'Heartbeat':

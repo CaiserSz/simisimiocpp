@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
+import performanceOptimizer from '../utils/performanceOptimizer.js';
 
 /**
  * Request Middleware
@@ -104,6 +105,9 @@ export const requestLoggingMiddleware = (req, res, next) => {
         contentLength: req.get('Content-Length')
     });
 
+    // Increment request count
+    performanceOptimizer.metrics.requestCount++;
+
     // Log request completion
     res.on('finish', () => {
         const duration = Date.now() - startTime;
@@ -120,14 +124,8 @@ export const requestLoggingMiddleware = (req, res, next) => {
         });
 
         // Record slow requests
-        if (duration > 5000) {
-            logger.warn(`🐌 Slow request detected`, {
-                requestId,
-                method: req.method,
-                url: req.originalUrl,
-                duration: `${duration}ms`,
-                threshold: '5000ms'
-            });
+        if (duration > performanceOptimizer.thresholds.slowRequestThreshold) {
+            performanceOptimizer.recordSlowRequest(req.originalUrl, duration, req.method);
         }
     });
 

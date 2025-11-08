@@ -20,6 +20,7 @@ import WebSocketServer from './services/WebSocketServer.js';
 import DatabaseManager from './services/database.service.js';
 import logger from './utils/logger.js';
 import { initializePerformanceOptimizations } from './utils/performance.js';
+import performanceOptimizer from './utils/performanceOptimizer.js';
 
 // Error handling
 import {
@@ -231,6 +232,23 @@ app.use('/api', apiVersionMiddleware, (req, res, next) => {
 app.use('/api/simulator', simulatorRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api', apiRouter);
+
+// Performance summary endpoint
+app.get('/health/performance', async(req, res) => {
+    try {
+        const summary = performanceOptimizer.getSummary();
+        res.json({
+            success: true,
+            data: summary
+        });
+    } catch (error) {
+        logger.error('Error getting performance summary:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get performance summary'
+        });
+    }
+});
 
 // Health check endpoint with detailed status
 app.get('/health/detailed', async(req, res) => {
