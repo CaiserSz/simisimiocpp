@@ -1,9 +1,9 @@
-import rateLimit from 'express-rate-limit';
-import helmet from 'helmet';
-import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
-import logger from '../utils/logger.js';
+import rateLimit from 'express-rate-limit';
+import { body } from 'express-validator';
+import helmet from 'helmet';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
 
 /**
  * Enhanced Security Middleware for Production
@@ -118,9 +118,9 @@ export const createRateLimiter = (options = {}) => {
         ...defaults,
         ...options,
         handler: (req, res) => {
-            const identifier = req.user?.id ? `User ${req.user.id}` : `IP ${req.ip}`;
+            const identifier = req.user ? .id ? `User ${req.user.id}` : `IP ${req.ip}`;
             logger.warn(`Rate limit exceeded for ${identifier}`, {
-                userId: req.user?.id,
+                userId: req.user ? .id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent'),
                 url: req.originalUrl,
@@ -424,7 +424,7 @@ export const logSecurityEvent = (event, req, additional = {}) => {
         url: req.originalUrl,
         method: req.method,
         timestamp: new Date().toISOString(),
-        userId: req.user?.id,
+        userId: req.user ? .id,
         ...additional
     });
 };
