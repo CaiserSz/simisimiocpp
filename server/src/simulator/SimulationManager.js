@@ -935,7 +935,7 @@ export class SimulationManager extends EventEmitter {
                 station.updateHealthScore();
             }
         }, 30000);
-        this.healthCheckInterval.unref ? .();
+        this.healthCheckInterval.unref?.();
     }
 
     /**
@@ -953,7 +953,7 @@ export class SimulationManager extends EventEmitter {
                 logger.error('Periodic backup failed:', error);
             }
         }, 3600000); // 1 hour
-        this.backupInterval.unref ? .();
+        this.backupInterval.unref?.();
     }
 
     /**
@@ -1238,7 +1238,7 @@ export class SimulationManager extends EventEmitter {
             }
 
             // Create final backup
-            if (this.backupService ? .backupState) {
+            if (this.backupService?.backupState) {
                 try {
                     await this.backupService.backupState(this, { trigger: 'shutdown' });
                     logger.info('✅ Final backup created');

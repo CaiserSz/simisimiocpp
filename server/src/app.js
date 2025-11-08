@@ -430,9 +430,10 @@ const startServer = async() => {
 
                     // Shutdown Cache Manager
                     try {
-                        const cacheManagerModule = await import('./services/CacheManager.js');
+                        const cacheManagerModule = await
+                        import ('./services/CacheManager.js');
                         const cacheManagerInstance = cacheManagerModule.default;
-                        if (cacheManagerInstance?.shutdown) {
+                        if (cacheManagerInstance ? .shutdown) {
                             await cacheManagerInstance.shutdown();
                             logger.info('💾 Cache Manager shut down');
                         }
