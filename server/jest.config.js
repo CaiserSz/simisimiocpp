@@ -6,29 +6,64 @@ export default {
         '**/src/__tests__/**/*.test.js'
     ],
     testTimeout: 30000,
+    
+    // Parallelization configuration
+    maxWorkers: process.env.CI ? '50%' : '75%', // Use 75% of CPU cores in local, 50% in CI
+    runInBand: false, // Enable parallelization for faster execution
+    
+    // Test isolation and cleanup
+    resetMocks: true,
+    restoreMocks: true,
+    clearMocks: true,
+    
+    // Coverage configuration
     collectCoverageFrom: [
         'src/**/*.js',
         '!src/tests/**',
         '!src/__tests__/**',
         '!src/app.js',
         '!src/**/*.test.js',
-        '!src/**/index.js'
+        '!src/**/index.js',
+        '!src/mock/**' // Exclude mock CSMS from coverage
     ],
     coverageDirectory: 'coverage',
-    coverageReporters: ['text', 'lcov', 'html', 'json'],
+    coverageReporters: ['text', 'lcov', 'html', 'json', 'text-summary'],
     coverageThreshold: {
         global: {
-            branches: 70,
-            functions: 70,
-            lines: 70,
-            statements: 70
+            branches: 75, // Increased from 70
+            functions: 75, // Increased from 70
+            lines: 75, // Increased from 70
+            statements: 75 // Increased from 70
         }
     },
+    
+    // Setup and teardown
     setupFilesAfterEnv: ['<rootDir>/src/tests/utils/setup.js'],
-    // Note: moduleNameMapper removed - Jest ESM handles imports natively
+    
+    // Module configuration
     moduleFileExtensions: ['js', 'json'],
     testPathIgnorePatterns: ['/node_modules/', '/coverage/'],
+    
+    // Output configuration
     verbose: true,
     detectOpenHandles: true,
-    forceExit: true
+    forceExit: true,
+    
+    // Performance optimization
+    cache: true,
+    cacheDirectory: '<rootDir>/.jest-cache',
+    
+    // Test execution optimization
+    bail: false, // Don't bail on first failure
+    errorOnDeprecated: true,
+    
+    // Worker configuration
+    workerIdleMemoryLimit: '500MB', // Kill workers if memory exceeds 500MB
+    
+    // Globals (for ESM compatibility)
+    globals: {
+        'ts-jest': {
+            useESM: true
+        }
+    }
 };

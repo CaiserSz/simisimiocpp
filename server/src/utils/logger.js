@@ -2,12 +2,13 @@ import fs from 'fs';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 const __filename = fileURLToPath(
     import.meta.url);
 const __dirname = dirname(__filename);
 
-const { combine, timestamp, printf, colorize, align } = winston.format;
+const { combine, timestamp, printf, colorize, align, errors, splat, json } = winston.format;
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../../logs');
@@ -15,65 +16,71 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Custom log format
-const logFormat = printf(({ level, message, timestamp, ...meta }) => {
-    const metaString = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
-    return `${timestamp} [${level}]: ${message}${metaString}`;
+// Enhanced log format with structured data
+const logFormat = printf(({ level, message, timestamp, traceId, spanId, ...meta }) => {
+    const traceInfo = traceId ? `[trace:${traceId}${spanId ? ` span:${spanId}` : ''}]` : '';
+    const metaString = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+    return `${timestamp} [${level}]${traceInfo}: ${message}${metaString}`;
 });
 
-// Lazy load config to avoid circular dependency
-const getConfig = () => {
-    // Use dynamic import to break circular dependency
-    if (process.env.NODE_ENV === 'test') {
-        // In test environment, use environment variables directly
-        return {
-            logging: { level: process.env.LOG_LEVEL || 'error' },
-            env: 'test'
-        };
-    }
-    // Lazy import config only when needed
-    return import ('../config/config.js').then(m => m.default);
-};
+// Structured JSON format for log aggregation
+const jsonFormat = combine(
+    timestamp(),
+    errors({ stack: true }),
+    splat(),
+    json()
+);
 
 // Get log level - use env var in test, otherwise default
 const getLogLevel = () => {
     if (process.env.NODE_ENV === 'test') {
         return process.env.LOG_LEVEL || 'error';
     }
-    // For non-test, we'll initialize logger after config loads
     return process.env.LOG_LEVEL || 'info';
 };
 
-// Logger configuration - use lazy config loading
+// Logger configuration with enhanced structured logging
 const logger = winston.createLogger({
     level: getLogLevel(),
-    format: combine(
-        timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.errors({ stack: true }),
-        winston.format.splat(),
-        winston.format.json()
-    ),
-    defaultMeta: { service: 'ocpp-simulator' },
+    format: jsonFormat,
+    defaultMeta: { 
+        service: 'ocpp-simulator',
+        environment: process.env.NODE_ENV || 'development'
+    },
     transports: [
-        // Write all logs with level `error` and below to `error.log`
-        new winston.transports.File({
-            filename: path.join(logsDir, 'error.log'),
+        // Error logs with daily rotation
+        new DailyRotateFile({
+            filename: path.join(logsDir, 'error-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
             level: 'error',
-            maxsize: 10485760, // 10MB
-            maxFiles: 5,
+            maxSize: '20m',
+            maxFiles: '14d', // Keep 14 days of error logs
+            format: jsonFormat
         }),
-        // Write all logs to `combined.log`
-        new winston.transports.File({
-            filename: path.join(logsDir, 'combined.log'),
-            maxsize: 10485760, // 10MB
-            maxFiles: 5,
+        
+        // Combined logs with daily rotation
+        new DailyRotateFile({
+            filename: path.join(logsDir, 'combined-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '7d', // Keep 7 days of combined logs
+            format: jsonFormat
         }),
+        
+        // Application logs (info and above)
+        new DailyRotateFile({
+            filename: path.join(logsDir, 'app-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            level: 'info',
+            maxSize: '20m',
+            maxFiles: '7d',
+            format: jsonFormat
+        })
     ],
     exitOnError: false, // Don't exit on handled exceptions
 });
 
 // If we're not in production, also log to the console with colors
-// Use lazy check to avoid circular dependency
 if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     logger.add(
         new winston.transports.Console({
@@ -87,6 +94,24 @@ if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     );
 }
 
+// Enhanced logger methods with trace support
+const originalLog = logger.log.bind(logger);
+logger.log = function(level, message, meta = {}) {
+    // Extract trace context if available
+    const traceId = meta.traceId || meta.trace?.traceId;
+    const spanId = meta.spanId || meta.trace?.spanId;
+    
+    if (traceId || spanId) {
+        meta = {
+            ...meta,
+            traceId,
+            spanId
+        };
+    }
+    
+    return originalLog(level, message, meta);
+};
+
 // Create a stream object with a 'write' function that will be used by Morgan
 logger.stream = {
     write: function(message) {
@@ -94,4 +119,5 @@ logger.stream = {
     },
 };
 
+// Export logger with enhanced methods
 export default logger;

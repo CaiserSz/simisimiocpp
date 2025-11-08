@@ -21,6 +21,7 @@ import DatabaseManager from './services/database.service.js';
 import logger from './utils/logger.js';
 import { initializePerformanceOptimizations } from './utils/performance.js';
 import performanceOptimizer from './utils/performanceOptimizer.js';
+import { traceMiddleware } from './utils/tracing.js';
 
 // Error handling
 import {
@@ -246,6 +247,56 @@ app.get('/health/performance', async(req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to get performance summary'
+        });
+    }
+});
+
+// Tracing summary endpoint
+app.get('/health/tracing', async(req, res) => {
+    try {
+        const { tracer } = await import('./utils/tracing.js');
+        const summary = tracer.getSummary();
+        res.json({
+            success: true,
+            data: summary
+        });
+    } catch (error) {
+        logger.error('Error getting tracing summary:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get tracing summary'
+        });
+    }
+});
+
+// Log aggregation endpoint
+app.get('/health/logs', async(req, res) => {
+    try {
+        const { logAggregator } = await import('./utils/logAggregation.js');
+        const { traceId, level, startTime, endTime } = req.query;
+        
+        const logs = logAggregator.getAggregatedLogs({
+            traceId,
+            level,
+            startTime,
+            endTime
+        });
+        
+        const statistics = logAggregator.getStatistics();
+        
+        res.json({
+            success: true,
+            data: {
+                logs: logs.slice(-100), // Last 100 logs
+                statistics,
+                total: logs.length
+            }
+        });
+    } catch (error) {
+        logger.error('Error getting logs:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get logs'
         });
     }
 });
