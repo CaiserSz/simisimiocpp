@@ -152,6 +152,18 @@ app.get('/dashboard', (req, res) => {
 // Static assets for dashboard
 app.use('/dashboard', express.static(path.join(__dirname, 'public')));
 
+// Metrics endpoint (Prometheus)
+app.get('/metrics', async (req, res) => {
+    try {
+        const metrics = await metricsCollector.getMetrics();
+        res.set('Content-Type', metricsCollector.register.contentType);
+        res.end(metrics);
+    } catch (error) {
+        logger.error('Error getting metrics:', error);
+        res.status(500).end('# Error getting metrics');
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({

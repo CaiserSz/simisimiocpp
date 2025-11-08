@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔌 EV Station Simulator Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
@@ -13,42 +15,66 @@
             transition: all 0.3s ease;
             border-left: 4px solid #28a745;
         }
+        
         .station-card.offline {
             border-left-color: #dc3545;
         }
+        
         .station-card.charging {
             border-left-color: #ffc107;
         }
+        
         .metrics-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
+        
         .pulse {
             animation: pulse 2s infinite;
         }
+        
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
         }
-        .status-online { color: #28a745; }
-        .status-offline { color: #dc3545; }
-        .status-charging { color: #ffc107; }
+        
+        .status-online {
+            color: #28a745;
+        }
+        
+        .status-offline {
+            color: #dc3545;
+        }
+        
+        .status-charging {
+            color: #ffc107;
+        }
+        
         .navbar-brand {
             font-size: 1.5rem;
             font-weight: bold;
         }
+        
         .connection-status {
             position: fixed;
             top: 70px;
             right: 20px;
             z-index: 1000;
         }
+        
         .loading-spinner {
             display: none;
         }
     </style>
 </head>
+
 <body class="bg-light">
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -71,8 +97,7 @@
     <!-- Connection Status Alert -->
     <div class="connection-status">
         <div class="alert alert-danger alert-dismissible fade" id="connection-alert" role="alert">
-            <i class="bi bi-exclamation-triangle"></i>
-            Connection lost. Trying to reconnect...
+            <i class="bi bi-exclamation-triangle"></i> Connection lost. Trying to reconnect...
             <div class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></div>
         </div>
     </div>
@@ -206,57 +231,86 @@
         class EVSimulatorDashboard {
             constructor() {
                 console.log('🚀 Initializing EV Simulator Dashboard...');
-                
+
                 this.ws = null;
                 this.stations = new Map();
-                this.metrics = { power: [], energy: [], sessions: [] };
+                this.metrics = {
+                    power: [],
+                    energy: [],
+                    sessions: []
+                };
                 this.chart = null;
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
-                
+
                 this.initializeWebSocket();
                 this.initializeChart();
                 this.loadStations();
                 this.setupEventListeners();
-                
+
                 // Add test button for debugging
                 this.addDebugButton();
-                
+
                 console.log('✅ Dashboard initialization complete');
             }
 
             initializeWebSocket() {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}`;
-                
-                this.ws = new WebSocket(wsUrl);
-                
-                this.ws.onopen = () => {
-                    console.log('WebSocket connected');
+                console.log('🔌 Initializing Socket.IO connection...');
+
+                // Socket.IO connection (no authentication required for now)
+                this.ws = io({
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    reconnectionAttempts: this.maxReconnectAttempts,
+                    transports: ['websocket', 'polling']
+                });
+
+                this.ws.on('connect', () => {
+                    console.log('✅ Socket.IO connected');
                     this.updateConnectionStatus(true);
                     this.reconnectAttempts = 0;
-                };
-                
-                this.ws.onmessage = (event) => {
-                    this.handleWebSocketMessage(JSON.parse(event.data));
-                };
-                
-                this.ws.onclose = () => {
-                    console.log('WebSocket disconnected');
+
+                    // Subscribe to simulation events
+                    this.ws.emit('subscribe:simulation', {});
+                });
+
+                this.ws.on('simulation:update', (data) => {
+                    console.log('Simulation update:', data);
+                    this.handleWebSocketMessage({
+                        type: 'system_stats',
+                        stats: data
+                    });
+                });
+
+                this.ws.on('station:update', (data) => {
+                    console.log('Station update:', data);
+                    this.handleWebSocketMessage({
+                        type: 'station_update',
+                        station: data
+                    });
+                });
+
+                this.ws.on('disconnect', (reason) => {
+                    console.log('Socket.IO disconnected:', reason);
                     this.updateConnectionStatus(false);
-                    this.attemptReconnect();
-                };
-                
-                this.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    this.showToast('WebSocket Error', 'Connection error occurred', 'danger');
-                };
+                });
+
+                this.ws.on('connect_error', (error) => {
+                    console.error('Socket.IO connection error:', error);
+                    this.updateConnectionStatus(false);
+                });
+
+                this.ws.on('error', (error) => {
+                    console.error('Socket.IO error:', error);
+                    this.showToast('Connection Error', 'Real-time updates unavailable', 'warning');
+                });
             }
 
             updateConnectionStatus(connected) {
                 const statusBadge = document.getElementById('connection-status');
                 const connectionAlert = document.getElementById('connection-alert');
-                
+
                 if (connected) {
                     statusBadge.className = 'badge bg-success me-3';
                     statusBadge.innerHTML = '<i class="bi bi-wifi"></i> Connected';
@@ -296,12 +350,12 @@
             async loadStations() {
                 try {
                     console.log('Loading stations...');
-                    
+
                     const response = await fetch('/api/simulator/stations');
                     const data = await response.json();
-                    
+
                     console.log('Stations API response:', data);
-                    
+
                     // Handle different API response formats
                     let stations = [];
                     if (data.data && data.data.stations) {
@@ -311,7 +365,7 @@
                     } else if (Array.isArray(data.data)) {
                         stations = data.data;
                     }
-                    
+
                     console.log('Final stations array:', stations);
                     this.renderStations(stations);
                 } catch (error) {
@@ -324,7 +378,7 @@
 
             renderStations(stations) {
                 const grid = document.getElementById('stations-grid');
-                
+
                 if (stations.length === 0) {
                     grid.innerHTML = `
                         <div class="col-12 text-center py-5">
@@ -384,7 +438,7 @@
             async controlStation(stationId, action) {
                 try {
                     let url, method = 'PUT';
-                    
+
                     switch (action) {
                         case 'start':
                             url = `/api/simulator/stations/${stationId}/start`;
@@ -400,9 +454,11 @@
                             throw new Error('Invalid action');
                     }
 
-                    const response = await fetch(url, { method });
+                    const response = await fetch(url, {
+                        method
+                    });
                     const data = await response.json();
-                    
+
                     if (data.success) {
                         this.showToast('Success', `Station ${action}ed successfully`, 'success');
                         this.loadStations();
@@ -418,24 +474,29 @@
             async createStation(formData) {
                 try {
                     console.log('Creating station with data:', formData);
-                    
+
                     const response = await fetch('/api/simulator/stations', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
                         body: JSON.stringify(formData)
                     });
-                    
+
                     console.log('Response status:', response.status);
                     const data = await response.json();
                     console.log('Response data:', data);
-                    
-                    if (data.success) {
+
+                    if (response.ok && data.success) {
                         this.showToast('Success', 'Station created successfully', 'success');
                         // Reload stations after creation
                         setTimeout(() => this.loadStations(), 1000);
                         document.getElementById('station-form').reset();
+                    } else if (response.status === 401) {
+                        this.showToast('Warning', 'Authentication required - please login', 'warning');
                     } else {
-                        throw new Error(data.error || 'Failed to create station');
+                        throw new Error(data.error ? .message || data.error || 'Failed to create station');
                     }
                 } catch (error) {
                     console.error('Error creating station:', error);
@@ -488,13 +549,13 @@
 
             updateChart(power, sessions) {
                 const now = new Date().toLocaleTimeString();
-                
+
                 if (this.chart.data.labels.length > 20) {
                     this.chart.data.labels.shift();
                     this.chart.data.datasets[0].data.shift();
                     this.chart.data.datasets[1].data.shift();
                 }
-                
+
                 this.chart.data.labels.push(now);
                 this.chart.data.datasets[0].data.push(power);
                 this.chart.data.datasets[1].data.push(sessions);
@@ -503,19 +564,19 @@
 
             setupEventListeners() {
                 console.log('🔧 Setting up event listeners...');
-                
+
                 const form = document.getElementById('station-form');
                 if (!form) {
                     console.error('❌ Form not found: station-form');
                     return;
                 }
-                
+
                 console.log('✅ Form found, adding submit listener');
-                
+
                 form.addEventListener('submit', (e) => {
                     console.log('🚀 Form submitted!');
                     e.preventDefault();
-                    
+
                     const formData = {
                         stationId: document.getElementById('station-id').value,
                         vendor: document.getElementById('vendor').value,
@@ -526,17 +587,17 @@
                         csmsUrl: document.getElementById('csms-url').value,
                         autoStart: true
                     };
-                    
+
                     console.log('📝 Form data prepared:', formData);
                     this.createStation(formData);
                 });
-                
+
                 console.log('✅ Event listeners setup complete');
             }
 
             addDebugButton() {
                 console.log('🔧 Adding debug button...');
-                
+
                 // Create a test station immediately for debugging
                 setTimeout(() => {
                     console.log('🧪 Creating test station for debugging...');
@@ -565,14 +626,14 @@
                         </div>
                     </div>
                 `;
-                
+
                 const toastContainer = document.getElementById('toast-container');
                 toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-                
+
                 const toastElement = toastContainer.lastElementChild;
                 const toast = new bootstrap.Toast(toastElement);
                 toast.show();
-                
+
                 toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
             }
         }
@@ -586,9 +647,11 @@
 
         async function startAllStations() {
             try {
-                const response = await fetch('/api/simulator/stations/start-all', { method: 'PUT' });
+                const response = await fetch('/api/simulator/stations/start-all', {
+                    method: 'PUT'
+                });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     dashboard.showToast('Success', 'All stations started', 'success');
                     dashboard.loadStations();
@@ -600,9 +663,11 @@
 
         async function stopAllStations() {
             try {
-                const response = await fetch('/api/simulator/stations/stop-all', { method: 'PUT' });
+                const response = await fetch('/api/simulator/stations/stop-all', {
+                    method: 'PUT'
+                });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     dashboard.showToast('Success', 'All stations stopped', 'warning');
                     dashboard.loadStations();
@@ -618,4 +683,5 @@
         });
     </script>
 </body>
+
 </html>
