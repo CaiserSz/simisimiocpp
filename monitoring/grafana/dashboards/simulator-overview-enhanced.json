@@ -1,0 +1,280 @@
+{
+  "id": null,
+  "uid": "simulator-overview-enhanced",
+  "title": "Simulator Overview Enhanced",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "description": "Enhanced dashboard with protocol-specific panels, station-level metrics, and transaction lifecycle visualization.",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Stations",
+      "gridPos": { "x": 0, "y": 0, "w": 3, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(ocpp_stations_total)",
+          "legendFormat": "Stations"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Online Stations",
+      "gridPos": { "x": 3, "y": 0, "w": 3, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(ocpp_stations_total{status=\"online\"})",
+          "legendFormat": "Online"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Active Charging Sessions",
+      "gridPos": { "x": 6, "y": 0, "w": 3, "h": 4 },
+      "targets": [
+        {
+          "expr": "charging_sessions_active",
+          "legendFormat": "Sessions"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Energy Delivered (kWh)",
+      "gridPos": { "x": 9, "y": 0, "w": 3, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(energy_delivered_kwh_total)",
+          "legendFormat": "kWh"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "OCPP Message Rate by Protocol",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(ocpp_messages_total[5m])) by (protocol_version)",
+          "legendFormat": "{{protocol_version}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "OCPP 1.6J vs 2.0.1 Message Breakdown",
+      "gridPos": { "x": 0, "y": 10, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(ocpp_messages_total{protocol_version=\"1.6J\"}[5m])) by (message_type)",
+          "legendFormat": "1.6J {{message_type}}"
+        },
+        {
+          "expr": "sum(rate(ocpp_messages_total{protocol_version=\"2.0.1\"}[5m])) by (message_type)",
+          "legendFormat": "2.0.1 {{message_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Station Status Distribution",
+      "gridPos": { "x": 6, "y": 10, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "ocpp_stations_total",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "OCPP Message Success vs Failure Rate",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(ocpp_messages_total{status=\"success\"}[5m]))",
+          "legendFormat": "Success"
+        },
+        {
+          "expr": "sum(rate(ocpp_messages_total{status=\"failure\"}[5m]))",
+          "legendFormat": "Failure"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "OCPP Message Latency by Type",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ocpp_message_latency_seconds_bucket[5m])) by (le, message_type))",
+          "legendFormat": "p95 {{message_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Charging Session Duration Distribution",
+      "gridPos": { "x": 0, "y": 28, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(charging_session_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(charging_session_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(charging_session_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Energy Delivery Rate",
+      "gridPos": { "x": 6, "y": 28, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(energy_delivered_kwh_total[5m]))",
+          "legendFormat": "kWh/s"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Station-Level Metrics",
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "ocpp_stations_total",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "status": 0,
+              "Value": 1
+            },
+            "renameByName": {
+              "status": "Status",
+              "Value": "Count"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate (5m avg)",
+      "gridPos": { "x": 0, "y": 42, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "ops"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(application_errors_total[5m]))",
+          "legendFormat": "errors/s"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Simulator Up",
+      "gridPos": { "x": 4, "y": 42, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "min(up{job=\"simulator\"})",
+          "legendFormat": "simulator"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "HTTP Request Rate",
+      "gridPos": { "x": 8, "y": 42, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "req/s"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "protocol_version",
+        "type": "query",
+        "label": "Protocol Version",
+        "datasource": "Prometheus",
+        "query": {
+          "query": "label_values(ocpp_messages_total, protocol_version)",
+          "refId": "StandardVariableQuery"
+        },
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          }
+        ],
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}
+

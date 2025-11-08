@@ -161,7 +161,9 @@ WS_TESTS=true SIM_FUNCTIONAL_TESTS=true npm test
 
 ### Mock CSMS Control API
 
-The mock CSMS exposes a lightweight control plane (default `http://localhost:9320`) for error injection and network simulation:
+The mock CSMS exposes a lightweight control plane (default `http://localhost:9320`) for error injection, network simulation, message pattern matching, and connection state simulation:
+
+#### Basic Behavior Controls
 
 | Endpoint | Method | Payload | Description |
 |----------|--------|---------|-------------|
@@ -172,12 +174,41 @@ The mock CSMS exposes a lightweight control plane (default `http://localhost:932
 | `/mock/behavior/error` | POST | `{ "type": "disconnect" }` | Closes the socket after the next response. |
 | `/mock/behavior/reset` | POST | – | Clears all injected behaviours. |
 
-Example:
+#### Advanced: Message Pattern Matching
+
+| Endpoint | Method | Payload | Description |
+|----------|--------|---------|-------------|
+| `/mock/pattern/register` | POST | `{ "pattern": "Heartbeat", "handler": "custom" }` | Register a message pattern handler. Supports exact match, wildcard (`Boot*`), and JSON path (`MeterValues.connectorId=1`). |
+| `/mock/pattern/clear` | POST | – | Clear all registered patterns. |
+
+#### Advanced: Connection State Simulation
+
+| Endpoint | Method | Payload | Description |
+|----------|--------|---------|-------------|
+| `/mock/connection/state` | POST | `{ "stationId": "STATION_001", "type": "intermittent", "disconnectProbability": 0.1, "reconnectDelay": 2000, "messageDropProbability": 0.05 }` | Configure connection state simulation for a station. Types: `stable`, `intermittent`, `unreliable`. |
+| `/mock/connection/reset` | POST | `{ "stationId": "STATION_001" }` or `{}` | Reset connection state for a station or all stations. |
+| `/mock/state` | GET | – | Get current mock CSMS state (behavior, patterns, connections, connection states). |
+
+Examples:
 
 ```bash
+# Basic latency injection
 curl -X POST http://localhost:9320/mock/behavior/latency \
   -H "Content-Type: application/json" \
   -d '{"minMs":150,"maxMs":300}'
+
+# Register message pattern
+curl -X POST http://localhost:9320/mock/pattern/register \
+  -H "Content-Type: application/json" \
+  -d '{"pattern":"Boot*","handler":"custom"}'
+
+# Configure intermittent connection
+curl -X POST http://localhost:9320/mock/connection/state \
+  -H "Content-Type: application/json" \
+  -d '{"stationId":"STATION_001","type":"intermittent","disconnectProbability":0.1}'
+
+# Get current state
+curl http://localhost:9320/mock/state
 ```
 
 ---
