@@ -6,8 +6,10 @@
  * Purpose: Ensure complete system works end-to-end
  */
 
-const runE2ESuite = process.env.E2E_TESTS === 'true';
-const describeOrSkip = runE2ESuite ? describe : describe.skip;
+// CRITICAL: These tests are now enabled by default for production readiness
+// Set SKIP_E2E_TESTS=true to skip them (for quick checks only)
+const skipE2ETests = process.env.SKIP_E2E_TESTS === 'true';
+const describeOrSkip = skipE2ETests ? describe.skip : describe;
 
 describeOrSkip('End-to-End Validation', () => {
     let simulationManager;

@@ -2,8 +2,10 @@ import { jest } from '@jest/globals';
 import { SimulationManager } from '../../simulator/SimulationManager.js';
 import { StationSimulator } from '../../simulator/StationSimulator.js';
 
-const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
-const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
+// CRITICAL: These tests are now enabled by default for production readiness
+// Set SKIP_FUNCTIONAL_TESTS=true to skip them (for quick checks only)
+const skipFunctionalTests = process.env.SKIP_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = skipFunctionalTests ? describe.skip : describe;
 
 describeOrSkip('SimulationManager', () => {
     let simulationManager;

@@ -117,6 +117,13 @@ The simulator supports two CSMS connectivity strategies:
   npm run test:integration:remote
   ```
 
+- **Real CSMS with TLS** – test against production CSMS with TLS certificates.
+  ```bash
+  export REAL_CSMS_URL=wss://your-production-csms.com/ocpp
+  export REAL_CSMS_TLS_CONFIG='{"enabled":true,"rejectUnauthorized":true,"ca":"/path/to/ca.crt"}'
+  npm run test:real-csms
+  ```
+
 ### Docker Quick Start
 
 Spin up the simulator together with Redis, Prometheus, Grafana, and the mock CSMS with a single command:
@@ -141,22 +148,40 @@ cd server
 npm run test:compliance
 ```
 
-Use `WS_TESTS=true`, `SIM_FUNCTIONAL_TESTS=true`, or `E2E_TESTS=true` to opt into heavier suites when needed.
+### Test Suite Configuration
 
-### Optional Test Flags
+**CRITICAL:** All functional test suites are now enabled by default for production readiness. The default `npm test` command runs all critical tests including:
+- ✅ SimulationManager tests
+- ✅ StationSimulator tests  
+- ✅ SimpleUserStore tests
+- ✅ Memory leak detection tests
+- ✅ WebSocket server tests
+- ✅ End-to-end validation tests
 
-Several suites are disabled by default due to their runtime or external dependencies. Enable them explicitly when required:
+**Quick Test Options:**
+
+| Command | Description |
+|---------|-------------|
+| `npm test` | **Full test suite** (all functional tests enabled by default) |
+| `npm run test:quick` | Quick tests only (compliance + unit tests) |
+| `npm run test:full` | All tests including optional suites |
+| `npm run test:compliance` | OCPP compliance tests only |
+| `npm run test:real-csms` | Real CSMS integration tests (requires REAL_CSMS_URL) |
+
+**Skip Flags (for quick checks only):**
+
+If you need to skip certain test suites for quick checks, use these flags:
 
 | Flag | Effect |
 |------|--------|
-| `WS_TESTS=true` | Runs WebSocket server unit tests (requires socket endpoints). |
-| `SIM_FUNCTIONAL_TESTS=true` | Runs long-running simulator functional specs (starts stations, vehicles). |
-| `E2E_TESTS=true` | Executes end-to-end lifecycle validation tests. |
+| `SKIP_FUNCTIONAL_TESTS=true` | Skips SimulationManager, StationSimulator, SimpleUserStore tests |
+| `SKIP_WS_TESTS=true` | Skips WebSocket server tests |
+| `SKIP_E2E_TESTS=true` | Skips end-to-end validation tests |
 
-Example:
+Example (quick check without functional tests):
 
 ```bash
-WS_TESTS=true SIM_FUNCTIONAL_TESTS=true npm test
+SKIP_FUNCTIONAL_TESTS=true npm test
 ```
 
 ### Mock CSMS Control API
@@ -473,6 +498,8 @@ Tests include:
 
 ## 🚀 Production Deployment
 
+> 📘 **See [Production Deployment Runbook](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md) for comprehensive deployment guide**
+
 ### Environment Setup
 
 ```bash
@@ -494,6 +521,13 @@ REDIS_PASSWORD=your-redis-password
 
 # CSMS connection
 CSMS_URL=wss://your-production-csms:9220
+
+# TLS Configuration (for secure CSMS connections)
+TLS_ENABLED=true
+TLS_CLIENT_CERT=/path/to/client.crt
+TLS_CLIENT_KEY=/path/to/client.key
+TLS_CA=/path/to/ca.crt
+TLS_REJECT_UNAUTHORIZED=true
 
 # Email notifications
 SMTP_HOST=smtp.yourmailprovider.com
@@ -647,11 +681,28 @@ DEBUG=* npm run dev
 
 ## 📚 Documentation
 
+- [Production Deployment Runbook](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md) - Comprehensive production deployment guide
+- [CSMS Connection Requirements](docs/CSMS_CONNECTION_REQUIREMENTS.md) - CSMS connection setup
 - [WebSocket Events](WEBSOCKET_EVENTS.md) - Complete WebSocket API reference
 - [Simulator Guide](SIMULATOR_GUIDE.md) - Comprehensive usage guide
-- [Production Checklist](PRODUCTION_CHECKLIST.md) - Deployment checklist
 - [API Documentation](docs/API.md) - REST API reference
 - [Architecture Guide](docs/ARCHITECTURE.md) - System architecture
+
+### Mock CSMS Automation
+
+Automated scenario scripts for Mock CSMS testing:
+
+```bash
+# Run scenario scripts
+./scripts/mock-csms-scenarios.sh normal              # Normal operation
+./scripts/mock-csms-scenarios.sh high-latency        # High latency simulation
+./scripts/mock-csms-scenarios.sh intermittent-errors # Intermittent errors
+./scripts/mock-csms-scenarios.sh connection-drops    # Connection drops
+./scripts/mock-csms-scenarios.sh csms-unavailable    # CSMS unavailable
+./scripts/mock-csms-scenarios.sh protocol-errors     # Protocol errors
+```
+
+See script help: `./scripts/mock-csms-scenarios.sh --help`
 
 ---
 

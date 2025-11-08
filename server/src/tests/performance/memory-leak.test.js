@@ -6,8 +6,10 @@
  * Purpose: Detect memory leaks in long-running operations
  */
 
-const runPerformanceSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
-const describeOrSkip = runPerformanceSuite ? describe : describe.skip;
+// CRITICAL: These tests are now enabled by default for production readiness
+// Set SKIP_FUNCTIONAL_TESTS=true to skip them (for quick checks only)
+const skipFunctionalTests = process.env.SKIP_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = skipFunctionalTests ? describe.skip : describe;
 
 describeOrSkip('Memory Leak Detection', () => {
     let initialMemory;

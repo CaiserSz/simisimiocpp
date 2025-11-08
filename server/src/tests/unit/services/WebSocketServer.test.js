@@ -5,8 +5,10 @@ import WebSocketServer from '../../../services/WebSocketServer.js';
 import jwt from 'jsonwebtoken';
 import config from '../../../config/config.js';
 
-const runWebSocketSuite = process.env.WS_TESTS === 'true';
-const describeOrSkip = runWebSocketSuite ? describe : describe.skip;
+// CRITICAL: These tests are now enabled by default for production readiness
+// Set SKIP_WS_TESTS=true to skip them (for quick checks only)
+const skipWebSocketTests = process.env.SKIP_WS_TESTS === 'true';
+const describeOrSkip = skipWebSocketTests ? describe.skip : describe;
 
 describeOrSkip('WebSocketServer', () => {
   let httpServer;

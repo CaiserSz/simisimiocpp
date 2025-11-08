@@ -1,9 +1,16 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import WebSocket from 'ws';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import metricsCollector from '../../middleware/metrics.js';
 import circuitBreakerManager from '../../utils/circuitBreaker.js';
 import logger from '../../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Base OCPP Simulator Class
@@ -21,6 +28,11 @@ export class BaseOCPPSimulator extends EventEmitter {
         this.csmsUrl = config.csmsUrl;
         this.ws = null;
         this.isConnected = false;
+        
+        // TLS Configuration
+        this.tlsConfig = config.tls || {};
+        this.tlsEnabled = this.csmsUrl.startsWith('wss://') || this.tlsConfig.enabled === true;
+        this.tlsOptions = this.buildTLSOptions();
 
         // Message handling
         this.pendingRequests = new Map(); // messageId -> Promise resolver
@@ -96,6 +108,47 @@ export class BaseOCPPSimulator extends EventEmitter {
     }
 
     /**
+     * Build TLS options for secure WebSocket connections
+     */
+    buildTLSOptions() {
+        if (!this.tlsEnabled) {
+            return null;
+        }
+
+        const options = {};
+
+        // Client certificate (if provided)
+        if (this.tlsConfig.clientCert) {
+            options.cert = fs.readFileSync(this.tlsConfig.clientCert);
+        }
+        if (this.tlsConfig.clientKey) {
+            options.key = fs.readFileSync(this.tlsConfig.clientKey);
+        }
+        if (this.tlsConfig.clientCa) {
+            options.ca = Array.isArray(this.tlsConfig.clientCa)
+                ? this.tlsConfig.clientCa.map(ca => fs.readFileSync(ca))
+                : fs.readFileSync(this.tlsConfig.clientCa);
+        }
+
+        // CA certificate for server verification
+        if (this.tlsConfig.ca) {
+            options.ca = Array.isArray(this.tlsConfig.ca)
+                ? this.tlsConfig.ca.map(ca => fs.readFileSync(ca))
+                : fs.readFileSync(this.tlsConfig.ca);
+        }
+
+        // Reject unauthorized (default: true for production)
+        options.rejectUnauthorized = this.tlsConfig.rejectUnauthorized !== false;
+
+        // Custom certificate validation
+        if (this.tlsConfig.checkServerIdentity) {
+            options.checkServerIdentity = this.tlsConfig.checkServerIdentity;
+        }
+
+        return options;
+    }
+
+    /**
      * Connect to CSMS
      */
     async connect() {
@@ -105,9 +158,19 @@ export class BaseOCPPSimulator extends EventEmitter {
                 const protocolVersion = this.getProtocolVersion();
                 const subProtocol = this.getSubProtocol();
 
-                logger.info(`🔗 Connecting OCPP ${protocolVersion} client to CSMS: ${wsUrl}`);
+                logger.info(`🔗 Connecting OCPP ${protocolVersion} client to CSMS: ${wsUrl}${this.tlsEnabled ? ' (TLS enabled)' : ''}`);
 
-                this.ws = new WebSocket(wsUrl, [subProtocol]);
+                // WebSocket options
+                const wsOptions = {
+                    protocols: [subProtocol]
+                };
+
+                // Add TLS options if enabled
+                if (this.tlsEnabled && this.tlsOptions) {
+                    wsOptions.agent = new https.Agent(this.tlsOptions);
+                }
+
+                this.ws = new WebSocket(wsUrl, wsOptions);
 
                 this.ws.on('open', async() => {
                     logger.info(`✅ OCPP ${protocolVersion} WebSocket connected: ${this.stationId}`);

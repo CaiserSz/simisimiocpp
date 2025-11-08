@@ -84,7 +84,7 @@ export async function waitForOCPPResponse(simulator, messageId, timeout = 5000) 
         }
 
         // Wait for response
-        const originalResolve = simulator.pendingRequests.get(messageId) ? .resolve;
+        const originalResolve = simulator.pendingRequests.get(messageId)?.resolve;
         if (originalResolve) {
             simulator.pendingRequests.set(messageId, {
                 ...simulator.pendingRequests.get(messageId),

@@ -3,8 +3,10 @@ import { VehicleSimulator } from '../../simulator/VehicleSimulator.js';
 import { StationSimulator } from '../../simulator/StationSimulator.js';
 
 const CSMS_URL = process.env.CSMS_URL || 'ws://localhost:9220';
-const runSimulatorSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
-const describeOrSkip = runSimulatorSuite ? describe : describe.skip;
+// CRITICAL: These tests are now enabled by default for production readiness
+// Set SKIP_FUNCTIONAL_TESTS=true to skip them (for quick checks only)
+const skipFunctionalTests = process.env.SKIP_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = skipFunctionalTests ? describe.skip : describe;
 
 describeOrSkip('Simulator Functionality Tests', () => {
   let simulationManager;

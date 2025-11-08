@@ -1,0 +1,214 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Run linter
+        working-directory: ./server
+        run: npm run lint
+
+  test-compliance:
+    name: Compliance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Run compliance tests
+        working-directory: ./server
+        run: npm run test:compliance
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Run unit tests
+        working-directory: ./server
+        run: npm run test:unit
+
+  test-integration-mock:
+    name: Integration Tests (Mock CSMS)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Start mock CSMS
+        working-directory: ./server
+        run: npm run mock:csms &
+      - name: Wait for mock CSMS
+        run: sleep 5
+      - name: Run integration tests (mock)
+        working-directory: ./server
+        run: npm run test:integration:mock
+        env:
+          CSMS_MODE: mock
+          CSMS_URL: ws://localhost:9220
+
+  test-full:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Start mock CSMS
+        working-directory: ./server
+        run: npm run mock:csms &
+      - name: Wait for mock CSMS
+        run: sleep 5
+      - name: Run full test suite
+        working-directory: ./server
+        run: npm run test:full
+        env:
+          CSMS_MODE: mock
+          CSMS_URL: ws://localhost:9220
+          SIM_FUNCTIONAL_TESTS: true
+          WS_TESTS: true
+          E2E_TESTS: true
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Start mock CSMS
+        working-directory: ./server
+        run: npm run mock:csms &
+      - name: Wait for mock CSMS
+        run: sleep 5
+      - name: Run tests with coverage
+        working-directory: ./server
+        run: npm run test:coverage
+        env:
+          CSMS_MODE: mock
+          CSMS_URL: ws://localhost:9220
+          SIM_FUNCTIONAL_TESTS: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./server/coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  test-real-csms:
+    name: Real CSMS Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Run real CSMS integration tests
+        working-directory: ./server
+        run: npm run test:real-csms
+        env:
+          REAL_CSMS_URL: ${{ secrets.REAL_CSMS_URL }}
+          REAL_CSMS_TLS_CONFIG: ${{ secrets.REAL_CSMS_TLS_CONFIG }}
+        continue-on-error: true
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+      - name: Run security audit
+        working-directory: ./server
+        run: npm audit --audit-level=moderate
+
