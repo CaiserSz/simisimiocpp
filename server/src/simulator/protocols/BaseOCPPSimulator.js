@@ -44,7 +44,7 @@ export class BaseOCPPSimulator extends EventEmitter {
             timeout: 30000,
             resetTimeout: 60000
         });
-        this.circuitBreaker.setMaxListeners ? .(20);
+        this.circuitBreaker.setMaxListeners?.(20);
 
         // Listen to circuit breaker events
         this.circuitBreaker.on('open', () => {
@@ -191,7 +191,7 @@ export class BaseOCPPSimulator extends EventEmitter {
                         reject(new Error('Connection timeout'));
                     }
                 }, 10000); // 10 seconds
-                connectionTimeout.unref ? .();
+                connectionTimeout.unref?.();
 
             } catch (error) {
                 logger.error('Failed to create WebSocket connection:', error);
@@ -283,7 +283,7 @@ export class BaseOCPPSimulator extends EventEmitter {
                 }
             }
         }, delay);
-        this.reconnectTimer.unref ? .();
+        this.reconnectTimer.unref?.();
     }
 
     /**

@@ -1134,7 +1134,7 @@ export class SimulationManager extends EventEmitter {
      */
     updatePrometheusMetrics() {
         const stations = Array.from(this.stations.values());
-        
+
         // Count stations by status
         const statusCounts = {
             online: 0,
@@ -1155,7 +1155,7 @@ export class SimulationManager extends EventEmitter {
             } else {
                 statusCounts.offline++;
             }
-            
+
             // Check for errors
             if (station.status === 'Error' || station.status === 'Faulted') {
                 statusCounts.error++;
