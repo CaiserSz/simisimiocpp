@@ -7,18 +7,17 @@
  */
 
 import { SimulationManager } from '../../simulator/SimulationManager.js';
-import { StationSimulator } from '../../simulator/StationSimulator.js';
 
 /**
  * Create a test simulation manager with cleanup
  */
 export async function createTestSimulationManager() {
     const manager = new SimulationManager();
-    
+
     // Return manager with cleanup function
     return {
         manager,
-        cleanup: async () => {
+        cleanup: async() => {
             await manager.removeAllStations();
             await manager.shutdown();
         }
@@ -40,13 +39,13 @@ export async function createTestStation(config = {}) {
         csmsUrl: 'ws://localhost:9220',
         ...config
     };
-    
+
     const station = await manager.createStation(stationConfig);
-    
+
     return {
         station,
         manager,
-        cleanup: async () => {
+        cleanup: async() => {
             await station.stop();
             await manager.removeStation(station.stationId);
             await manager.shutdown();
@@ -76,16 +75,16 @@ export async function waitForOCPPResponse(simulator, messageId, timeout = 5000) 
         const timer = setTimeout(() => {
             reject(new Error(`OCPP response timeout for message ${messageId}`));
         }, timeout);
-        
+
         // Check if response already received
         if (!simulator.pendingRequests || !simulator.pendingRequests.has(messageId)) {
             clearTimeout(timer);
             resolve();
             return;
         }
-        
+
         // Wait for response
-        const originalResolve = simulator.pendingRequests.get(messageId)?.resolve;
+        const originalResolve = simulator.pendingRequests.get(messageId) ? .resolve;
         if (originalResolve) {
             simulator.pendingRequests.set(messageId, {
                 ...simulator.pendingRequests.get(messageId),
@@ -135,7 +134,7 @@ export const testFixtures = {
             maxPower: 150000
         }
     },
-    
+
     vehicleProfiles: {
         compact: {
             vehicleType: 'compact',
@@ -153,7 +152,7 @@ export const testFixtures = {
             maxChargingPower: 22000
         }
     },
-    
+
     ocppMessages: {
         bootNotification: {
             action: 'BootNotification',
@@ -186,14 +185,14 @@ export const performanceHelpers = {
     /**
      * Measure execution time
      */
-    measureTime: async (fn) => {
+    measureTime: async(fn) => {
         const start = process.hrtime.bigint();
         const result = await fn();
         const end = process.hrtime.bigint();
         const duration = Number(end - start) / 1000000; // Convert to milliseconds
         return { result, duration };
     },
-    
+
     /**
      * Memory snapshot
      */
@@ -206,7 +205,7 @@ export const performanceHelpers = {
             external: usage.external
         };
     },
-    
+
     /**
      * Compare memory snapshots
      */
@@ -230,4 +229,3 @@ export default {
     testFixtures,
     performanceHelpers
 };
-

@@ -55,7 +55,7 @@ global.testUtils = {
         try {
             await cleanupFn();
         } catch (error) {
-            console.warn('Cleanup error:', error);
+            // Ignore cleanup errors in tests
         }
     }
 };
@@ -65,17 +65,6 @@ beforeAll(async () => {
     // Set test environment variables
     process.env.NODE_ENV = 'test';
     process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
-    
-    // Suppress console warnings in tests (optional)
-    if (process.env.SUPPRESS_TEST_LOGS === 'true') {
-        global.console = {
-            ...console,
-            warn: jest.fn(),
-            log: jest.fn(),
-            debug: jest.fn(),
-            info: jest.fn()
-        };
-    }
 });
 
 // Global afterAll - cleanup test environment
@@ -89,18 +78,20 @@ afterAll(async () => {
 
 // Global beforeEach - reset mocks
 beforeEach(() => {
-    jest.clearAllMocks();
+    // Note: jest.clearAllMocks() is handled by Jest config (clearMocks: true)
 });
 
 // Global afterEach - cleanup after each test
 afterEach(() => {
-    // Clear any timers
-    jest.clearAllTimers();
+    // Note: jest.clearAllTimers() can be called if needed
 });
 
 // Handle unhandled promise rejections in tests
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection in test:', reason);
+process.on('unhandledRejection', (reason) => {
+    // Log but don't fail tests
+    if (process.env.VERBOSE_TESTS === 'true') {
+        console.error('Unhandled Rejection in test:', reason);
+    }
 });
 
 // Export test utilities

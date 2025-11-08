@@ -130,6 +130,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Cookie parser (required for CSRF protection)
 app.use(cookieParser());
 
+// Setup tracing middleware (must be before request middleware)
+app.use(traceMiddleware);
+
 // Setup request middleware (ID, timeout, logging, context)
 setupRequestMiddleware(app);
 
@@ -254,7 +257,8 @@ app.get('/health/performance', async(req, res) => {
 // Tracing summary endpoint
 app.get('/health/tracing', async(req, res) => {
     try {
-        const { tracer } = await import('./utils/tracing.js');
+        const { tracer } = await
+        import ('./utils/tracing.js');
         const summary = tracer.getSummary();
         res.json({
             success: true,
@@ -272,18 +276,19 @@ app.get('/health/tracing', async(req, res) => {
 // Log aggregation endpoint
 app.get('/health/logs', async(req, res) => {
     try {
-        const { logAggregator } = await import('./utils/logAggregation.js');
+        const { logAggregator } = await
+        import ('./utils/logAggregation.js');
         const { traceId, level, startTime, endTime } = req.query;
-        
+
         const logs = logAggregator.getAggregatedLogs({
             traceId,
             level,
             startTime,
             endTime
         });
-        
+
         const statistics = logAggregator.getStatistics();
-        
+
         res.json({
             success: true,
             data: {
@@ -310,7 +315,8 @@ app.get('/health/detailed', async(req, res) => {
             wsServer.getStatistics() : { error: 'WebSocket not initialized' };
 
         // Get circuit breaker status
-        const circuitBreakerManager = (await import('./utils/circuitBreaker.js')).default;
+        const circuitBreakerManager = (await
+            import ('./utils/circuitBreaker.js')).default;
         const circuitBreakers = circuitBreakerManager.getAllBreakers();
 
         const health = {
@@ -427,7 +433,7 @@ const startServer = async() => {
                         const cacheManagerModule = await
                         import ('./services/CacheManager.js');
                         const cacheManagerInstance = cacheManagerModule.default;
-                        if (cacheManagerInstance?.shutdown) {
+                        if (cacheManagerInstance ? .shutdown) {
                             await cacheManagerInstance.shutdown();
                             logger.info('💾 Cache Manager shut down');
                         }
