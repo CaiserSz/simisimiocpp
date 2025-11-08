@@ -34,7 +34,7 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
             'ConnectorPhaseRotation': 'NotApplicable',
             'ConnectorPhaseRotationMaxLength': '1',
             'GetConfigurationMaxKeys': '50',
-            [OCPP_CONFIG_KEYS.HEARTBEAT_INTERVAL]: config.heartbeatInterval ? .toString() || OCPP_DEFAULT_CONFIG.HEARTBEAT_INTERVAL,
+            [OCPP_CONFIG_KEYS.HEARTBEAT_INTERVAL]: config.heartbeatInterval?.toString() || OCPP_DEFAULT_CONFIG.HEARTBEAT_INTERVAL,
             'LightIntensity': '50',
             'LocalAuthorizeOffline': 'true',
             'LocalPreAuthorize': 'false',

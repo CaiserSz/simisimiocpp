@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Simulator Dashboards'
+    orgId: 1
+    folder: 'Simulator'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards

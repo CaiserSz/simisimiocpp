@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { performance } from 'node:perf_hooks';
 import logger from '../utils/logger.js';
 
 /**
@@ -18,7 +19,9 @@ export class NetworkSimulator extends EventEmitter {
 
         this.isConnected = true;
         this.lastDisconnection = null;
+        this.lastDisconnectionTime = null;
         this.disconnectionCheckInterval = null;
+        this.reconnectTimeout = null;
 
         // Statistics
         this.stats = {
@@ -101,6 +104,9 @@ export class NetworkSimulator extends EventEmitter {
                 this.simulateDisconnection();
             }
         }, 5000);
+
+        // Avoid keeping the event loop alive solely because of the interval during tests
+        this.disconnectionCheckInterval.unref?.();
     }
 
     /**
@@ -113,6 +119,7 @@ export class NetworkSimulator extends EventEmitter {
 
         this.isConnected = false;
         this.lastDisconnection = new Date();
+        this.lastDisconnectionTime = performance.now();
         this.stats.disconnections++;
 
         logger.warn(`🔌 Network disconnection simulated`);
@@ -121,9 +128,11 @@ export class NetworkSimulator extends EventEmitter {
         // Auto-reconnect after random delay (5-30 seconds)
         const reconnectDelay = 5000 + Math.random() * 25000;
 
-        setTimeout(() => {
+        this.reconnectTimeout = setTimeout(() => {
+            this.reconnectTimeout = null;
             this.simulateReconnection();
         }, reconnectDelay);
+        this.reconnectTimeout.unref?.();
     }
 
     /**
@@ -134,14 +143,34 @@ export class NetworkSimulator extends EventEmitter {
             return;
         }
 
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+
         this.isConnected = true;
         this.stats.reconnections++;
 
-        logger.info(`🔌 Network reconnected after ${((new Date() - this.lastDisconnection) / 1000).toFixed(1)}s`);
+        const nowTimestamp = performance.now();
+        const downtimeSeconds = (() => {
+            if (this.lastDisconnectionTime !== null) {
+                return Math.max((nowTimestamp - this.lastDisconnectionTime) / 1000, 0.001);
+            }
+
+            if (this.lastDisconnection) {
+                return Math.max((Date.now() - this.lastDisconnection.getTime()) / 1000, 0.001);
+            }
+
+            return 0;
+        })();
+
+        logger.info(`🔌 Network reconnected after ${downtimeSeconds.toFixed(1)}s`);
         this.emit('reconnected', {
             timestamp: new Date(),
-            downtime: (new Date() - this.lastDisconnection) / 1000
+            downtime: downtimeSeconds
         });
+
+        this.lastDisconnectionTime = null;
     }
 
     /**
@@ -198,6 +227,11 @@ export class NetworkSimulator extends EventEmitter {
         if (this.disconnectionCheckInterval) {
             clearInterval(this.disconnectionCheckInterval);
             this.disconnectionCheckInterval = null;
+        }
+
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
         }
     }
 }

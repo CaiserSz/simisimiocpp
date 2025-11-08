@@ -99,6 +99,89 @@ Server will start at `http://localhost:3001`
 
 ---
 
+### CSMS Testing Modes
+
+The simulator supports two CSMS connectivity strategies:
+
+- **Mock mode (default)** – runs an in-process mock CSMS that implements the subset of OCPP flows required by the integration suites.
+  ```bash
+  cd server
+  npm run test:integration:mock    # Run integration tests against the mock CSMS
+  npm run mock:csms                # Launch only the mock CSMS for manual experiments
+  ```
+
+- **Remote mode** – targets a real CSMS endpoint.
+  ```bash
+  export CSMS_MODE=remote
+  export CSMS_URL=wss://your-csms.example.com/ocpp
+  npm run test:integration:remote
+  ```
+
+### Docker Quick Start
+
+Spin up the simulator together with Redis, Prometheus, Grafana, and the mock CSMS with a single command:
+
+```bash
+docker compose up --build
+```
+
+Exposed endpoints:
+
+- Simulator API: `http://localhost:3001`
+- Mock CSMS WebSocket endpoint: `ws://localhost:9220`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3002` (default credentials `admin` / `grafana123`)
+
+### OCPP Compliance Test Suite
+
+Automated conformance checks cover both OCPP 1.6J and 2.0.1 message structures. Run them with:
+
+```bash
+cd server
+npm run test:compliance
+```
+
+Use `WS_TESTS=true`, `SIM_FUNCTIONAL_TESTS=true`, or `E2E_TESTS=true` to opt into heavier suites when needed.
+
+### Optional Test Flags
+
+Several suites are disabled by default due to their runtime or external dependencies. Enable them explicitly when required:
+
+| Flag | Effect |
+|------|--------|
+| `WS_TESTS=true` | Runs WebSocket server unit tests (requires socket endpoints). |
+| `SIM_FUNCTIONAL_TESTS=true` | Runs long-running simulator functional specs (starts stations, vehicles). |
+| `E2E_TESTS=true` | Executes end-to-end lifecycle validation tests. |
+
+Example:
+
+```bash
+WS_TESTS=true SIM_FUNCTIONAL_TESTS=true npm test
+```
+
+### Mock CSMS Control API
+
+The mock CSMS exposes a lightweight control plane (default `http://localhost:9320`) for error injection and network simulation:
+
+| Endpoint | Method | Payload | Description |
+|----------|--------|---------|-------------|
+| `/mock/behavior/latency` | POST | `{ "minMs": 100, "maxMs": 250 }` | Adds artificial response latency. |
+| `/mock/behavior/error` | POST | `{ "type": "rejectBoot" }` | Rejects the next BootNotification. |
+| `/mock/behavior/error` | POST | `{ "type": "callError", "code": "InternalError", "description": "Mock failure" }` | Forces the next request to receive CALLERROR. |
+| `/mock/behavior/error` | POST | `{ "type": "dropResponse" }` | Drops the next outbound response. |
+| `/mock/behavior/error` | POST | `{ "type": "disconnect" }` | Closes the socket after the next response. |
+| `/mock/behavior/reset` | POST | – | Clears all injected behaviours. |
+
+Example:
+
+```bash
+curl -X POST http://localhost:9320/mock/behavior/latency \
+  -H "Content-Type: application/json" \
+  -d '{"minMs":150,"maxMs":300}'
+```
+
+---
+
 ## 🎮 Usage
 
 ### 1. Authentication

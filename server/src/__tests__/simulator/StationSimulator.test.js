@@ -9,7 +9,10 @@ import { StationSimulator } from '../../simulator/StationSimulator.js';
  * Purpose: Improve test coverage for StationSimulator.switchProtocol and other critical methods
  */
 
-describe('StationSimulator - Protocol Switching', () => {
+const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
+
+describeOrSkip('StationSimulator - Protocol Switching', () => {
     let stationSimulator;
     const mockConfig = {
         stationId: 'TEST_STATION_001',

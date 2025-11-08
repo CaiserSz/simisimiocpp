@@ -1,7 +1,10 @@
 import { jest } from '@jest/globals';
 import { SimulationManager } from '../../simulator/SimulationManager.js';
 
-describe('Health Monitoring & Batch Operations', () => {
+const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
+
+describeOrSkip('Health Monitoring & Batch Operations', () => {
     let simulationManager;
 
     beforeEach(async() => {

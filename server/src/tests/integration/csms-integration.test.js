@@ -7,17 +7,25 @@
  */
 
 describe('CSMS Integration Tests', () => {
+    const CSMS_MODE = process.env.CSMS_MODE || 'mock';
     const CSMS_URL = process.env.CSMS_URL || 'ws://localhost:9220';
     const TEST_STATION_ID = 'INTEGRATION_TEST_STATION';
     let simulator;
     let connectionEvents = [];
+    let mockServer;
 
     beforeAll(async() => {
+        if (CSMS_MODE === 'mock') {
+            const { ensureMockCsms } = await
+            import ('../utils/mockCsmsServer.js');
+            mockServer = await ensureMockCsms(CSMS_URL);
+        }
+
         // Import simulator classes
         const { OCPP16JSimulator } = await
-        import ('../../../simulator/protocols/OCPP16JSimulator.js');
+        import ('../../simulator/protocols/OCPP16JSimulator.js');
         const { OCPP201Simulator } = await
-        import ('../../../simulator/protocols/OCPP201Simulator.js');
+        import ('../../simulator/protocols/OCPP201Simulator.js');
 
         // Store for later use
         global.OCPP16JSimulator = OCPP16JSimulator;
@@ -39,6 +47,15 @@ describe('CSMS Integration Tests', () => {
         }
     });
 
+    afterAll(async() => {
+        if (CSMS_MODE === 'mock' && mockServer) {
+            const { shutdownMockCsms } = await
+            import ('../utils/mockCsmsServer.js');
+            await shutdownMockCsms();
+            mockServer = null;
+        }
+    });
+
     describe('OCPP 1.6J Integration', () => {
         test('should connect to CSMS', async() => {
             const { OCPP16JSimulator } = global;
@@ -54,6 +71,7 @@ describe('CSMS Integration Tests', () => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Connection timeout'));
                 }, 10000);
+                timeout.unref?.();
 
                 simulator.once('connected', () => {
                     clearTimeout(timeout);
@@ -143,7 +161,8 @@ describe('CSMS Integration Tests', () => {
             // Wait for potential RemoteStartTransaction from CSMS
             const remoteStartPromise = new Promise((resolve) => {
                 simulator.once('remoteStartTransaction', resolve);
-                setTimeout(() => resolve(null), 5000);
+                const fallback = setTimeout(() => resolve(null), 5000);
+                fallback.unref?.();
             });
 
             const result = await remoteStartPromise;
@@ -167,6 +186,7 @@ describe('CSMS Integration Tests', () => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Connection timeout'));
                 }, 10000);
+                timeout.unref?.();
 
                 simulator.once('connected', () => {
                     clearTimeout(timeout);
@@ -240,12 +260,13 @@ describe('CSMS Integration Tests', () => {
             expect(simulator.isConnected).toBe(true);
 
             // Simulate connection loss
-            simulator.ws ? .close();
+            simulator.ws?.close();
 
             // Wait for reconnection attempt
             const reconnectPromise = new Promise((resolve) => {
                 simulator.once('reconnectionAttempt', resolve);
-                setTimeout(() => resolve(null), 10000);
+                const fallback = setTimeout(() => resolve(null), 10000);
+                fallback.unref?.();
             });
 
             const reconnectEvent = await reconnectPromise;
@@ -265,7 +286,8 @@ describe('CSMS Integration Tests', () => {
             const connectionPromise = new Promise((resolve) => {
                 simulator.once('error', resolve);
                 simulator.once('reconnectionFailed', resolve);
-                setTimeout(() => resolve({ type: 'timeout' }), 10000);
+                const fallback = setTimeout(() => resolve({ type: 'timeout' }), 10000);
+                fallback.unref?.();
             });
 
             try {

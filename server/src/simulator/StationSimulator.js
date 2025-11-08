@@ -1,9 +1,11 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
+import metricsCollector from '../middleware/metrics.js';
 import { OCPP16JSimulator } from './protocols/OCPP16JSimulator.js';
 import { OCPP201Simulator } from './protocols/OCPP201Simulator.js';
 import { VehicleSimulator } from './VehicleSimulator.js';
+import NetworkSimulator from './NetworkSimulator.js';
 
 /**
  * EV Charging Station Simulator
@@ -62,6 +64,15 @@ export class StationSimulator extends EventEmitter {
             sessions: [],
             errors: [],
             metrics: []
+        };
+
+        // Metrics tracking
+        this.metrics = {
+            totalSessions: 0,
+            totalEnergyDelivered: 0,
+            totalDuration: 0,
+            errorCount: 0,
+            lastHeartbeat: null
         };
 
         // Auto-start if enabled
@@ -512,6 +523,10 @@ export class StationSimulator extends EventEmitter {
         });
 
         logger.info(`⚡ Charging session started: ${transaction.transactionId} on connector ${connectorId}`);
+        
+        // Record charging session metric
+        metricsCollector.recordChargingSession('start');
+        
         this.emit('chargingStarted', {
             stationId: this.stationId,
             connectorId,
@@ -563,6 +578,9 @@ export class StationSimulator extends EventEmitter {
         // Update metrics
         this.metrics.totalEnergyDelivered += energyDelivered;
         this.metrics.totalDuration += duration;
+        
+        // Record charging session metric
+        metricsCollector.recordChargingSession('stop', duration, energyDelivered / 1000); // Convert Wh to kWh
 
         // Update session in history
         const sessionIndex = this.history.sessions.findIndex(

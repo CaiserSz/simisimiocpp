@@ -68,7 +68,7 @@ export const getStation = asyncHandler(async(req, res) => {
         data: {
             station: stationStatus,
             vehicles: vehicleStatus,
-            ocppStatus: station.ocppClient ? .getStatus()
+            ocppStatus: station.ocppClient?.getStatus()
         }
     });
 });

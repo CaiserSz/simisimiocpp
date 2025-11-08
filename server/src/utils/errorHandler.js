@@ -120,9 +120,9 @@ class ErrorHandler {
             errorInfo.request = {
                 method: req.method,
                 url: req.originalUrl || req.url,
-                ip: req.ip || req.connection ? .remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.get('User-Agent'),
-                userId: req.user ? .id,
+                userId: req.user?.id,
                 body: this.sanitizeRequestBody(req.body),
                 params: req.params,
                 query: req.query
@@ -150,7 +150,7 @@ class ErrorHandler {
             // Send to Sentry for server errors and non-operational errors
             if (!error.isOperational || error.statusCode >= 500) {
                 captureException(error, {
-                    user: req ? .user ? { id: req.user.id, username: req.user.username } : null,
+                    user: req?.user ? { id: req.user.id, username: req.user.username } : null,
                     tags: {
                         errorCode: error.errorCode || 'UNKNOWN',
                         statusCode: error.statusCode || 500
@@ -226,7 +226,7 @@ class ErrorHandler {
             this.errorPatterns.set(pattern.id, {
                 ...pattern,
                 lastOccurrence: new Date().toISOString(),
-                count: (this.errorPatterns.get(pattern.id) ? .count || 0) + 1
+                count: (this.errorPatterns.get(pattern.id)?.count || 0) + 1
             });
         }
     }
@@ -236,8 +236,8 @@ class ErrorHandler {
      */
     detectErrorPattern(error) {
         // Database connection patterns
-        if (error.message ? .includes('ECONNREFUSED') ||
-            error.message ? .includes('connection refused')) {
+        if (error.message?.includes('ECONNREFUSED') ||
+            error.message?.includes('connection refused')) {
             return {
                 id: 'DATABASE_CONNECTION_ISSUE',
                 type: 'connectivity',
@@ -307,7 +307,7 @@ class ErrorHandler {
                     method: req.method,
                     url: req.originalUrl || req.url,
                     ip: req.ip,
-                    userId: req.user ? .id
+                    userId: req.user?.id
                 } : null,
                 server: {
                     environment: process.env.NODE_ENV,
@@ -321,7 +321,7 @@ class ErrorHandler {
 
             // Send to Sentry
             captureException(error, {
-                user: req ? .user ? { id: req.user.id, username: req.user.username } : null,
+                user: req?.user ? { id: req.user.id, username: req.user.username } : null,
                 tags: {
                     errorCode: error.errorCode || 'CRITICAL',
                     statusCode: error.statusCode || 500,

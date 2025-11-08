@@ -11,8 +11,10 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test_jwt_secret_key_for_testing_only_minimum_32_characters';
 process.env.STORAGE_TYPE = 'json';
 process.env.DATA_DIR = path.join(__dirname, '../../../test-data');
-process.env.CSMS_URL = 'ws://localhost:9221';
 process.env.REDIS_URL = 'redis://localhost:6379/1';
+process.env.CSMS_MODE = process.env.CSMS_MODE || 'mock';
+process.env.CSMS_URL = process.env.CSMS_URL || 'ws://localhost:9220';
+process.env.ENABLE_AUTH = process.env.ENABLE_AUTH || 'true';
 
 // Global test utilities
 global.testUtils = {

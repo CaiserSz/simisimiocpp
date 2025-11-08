@@ -1,0 +1,48 @@
+groups:
+  - name: simulator-alerts
+    interval: 30s
+    rules:
+      - alert: SimulatorDown
+        expr: up{job="simulator"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Simulator service is down"
+          description: "Prometheus cannot reach the simulator /health/metrics endpoint."
+
+      - alert: HighErrorRate
+        expr: rate(application_errors_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated application error rate"
+          description: "Error counter exceeded 5 events per minute over the last 5 minutes."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile HTTP latency above 1s"
+          description: "Investigate slow endpoints or backend dependencies."
+
+      - alert: CsmsMessageFailures
+        expr: sum(rate(ocpp_messages_total{status="failure"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OCPP message failure rate above threshold"
+          description: "The CSMS is reporting failed OCPP messages at a rate greater than 1 per second."
+
+      - alert: NoActiveStations
+        expr: sum(ocpp_stations_total{status="online"}) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No stations are currently online"
+          description: "All simulated stations report offline or faulted status for the last 10 minutes."

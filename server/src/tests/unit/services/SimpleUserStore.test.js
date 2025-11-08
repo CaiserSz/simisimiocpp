@@ -5,8 +5,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(
     import.meta.url));
+const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
 
-describe('SimpleUserStore', () => {
+describeOrSkip('SimpleUserStore', () => {
     let userStore;
     let testDataDir;
     let originalUsersFile;
@@ -17,7 +19,7 @@ describe('SimpleUserStore', () => {
         await fs.mkdir(testDataDir, { recursive: true });
 
         // Store original users file path
-        originalUsersFile = userStore ? .usersFile;
+        originalUsersFile = userStore?.usersFile;
     });
 
     beforeEach(async() => {

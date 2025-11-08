@@ -1,8 +1,12 @@
-import { SimulationManager } from '../../../simulator/SimulationManager.js';
-import { VehicleSimulator } from '../../../simulator/VehicleSimulator.js';
-import { StationSimulator } from '../../../simulator/StationSimulator.js';
+import { SimulationManager } from '../../simulator/SimulationManager.js';
+import { VehicleSimulator } from '../../simulator/VehicleSimulator.js';
+import { StationSimulator } from '../../simulator/StationSimulator.js';
 
-describe('Simulator Functionality Tests', () => {
+const CSMS_URL = process.env.CSMS_URL || 'ws://localhost:9220';
+const runSimulatorSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runSimulatorSuite ? describe : describe.skip;
+
+describeOrSkip('Simulator Functionality Tests', () => {
   let simulationManager;
 
   beforeAll(() => {
@@ -23,7 +27,7 @@ describe('Simulator Functionality Tests', () => {
         ocppVersion: '1.6J',
         connectorCount: 2,
         maxPower: 22000,
-        csmsUrl: 'ws://localhost:9220'
+        csmsUrl: CSMS_URL
       };
 
       const station = await simulationManager.createStation(config);
@@ -36,7 +40,7 @@ describe('Simulator Functionality Tests', () => {
 
     test('Should create stations from predefined profile', async () => {
       const stations = await simulationManager.createStationsFromProfile('urban_ac', 3, {
-        csmsUrl: 'ws://localhost:9220'
+        csmsUrl: CSMS_URL
       });
 
       expect(stations).toHaveLength(3);
@@ -75,7 +79,7 @@ describe('Simulator Functionality Tests', () => {
         stationId: 'VEHICLE_TEST',
         ocppVersion: '1.6J',
         connectorCount: 2,
-        csmsUrl: 'ws://localhost:9220'
+        csmsUrl: CSMS_URL
       });
     });
 

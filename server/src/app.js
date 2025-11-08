@@ -355,11 +355,11 @@ const startServer = async() => {
 
                     // Shutdown Cache Manager
                     try {
-                        const CacheManager = (await
-                            import ('./services/CacheManager.js')).default;
-                        const cacheManager = CacheManager.getInstance();
-                        if (cacheManager) {
-                            await cacheManager.shutdown();
+                        const cacheManagerModule = await
+                        import ('./services/CacheManager.js');
+                        const cacheManagerInstance = cacheManagerModule.default;
+                        if (cacheManagerInstance?.shutdown) {
+                            await cacheManagerInstance.shutdown();
                             logger.info('💾 Cache Manager shut down');
                         }
                     } catch (error) {

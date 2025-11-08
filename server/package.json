@@ -20,10 +20,14 @@
         "test:coverage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand",
         "test:json-storage": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimpleUserStore|auth.controller.updated' --runInBand",
         "test:simulator": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='SimulationManager|WebSocketServer' --runInBand",
+        "test:integration:mock": "cross-env NODE_ENV=test CSMS_MODE=mock NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=tests/integration --runInBand",
+        "test:integration:remote": "cross-env NODE_ENV=test CSMS_MODE=remote NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=tests/integration --runInBand",
+        "test:compliance": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=tests/compliance --runInBand",
         "test:load": "k6 run src/tests/performance/load-test.js",
         "test:stress": "k6 run --vus 2000 --duration 10m src/tests/performance/load-test.js",
         "lint": "eslint . --ext .js",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "mock:csms": "node --experimental-modules src/mock/index.js"
     },
     "dependencies": {
         "bcrypt": "^5.1.1",

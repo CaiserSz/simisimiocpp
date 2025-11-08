@@ -1,0 +1,133 @@
+{
+  "id": null,
+  "uid": "simulator-overview",
+  "title": "Simulator Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "description": "Key health indicators for the EV simulator and mock CSMS.",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active HTTP Requests (5m avg)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "Requests/s"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Active Charging Sessions",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "charging_sessions_active",
+          "legendFormat": "Sessions"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP 95th Percentile Latency",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Application Errors",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(application_errors_total[5m])) by (error_type)",
+          "legendFormat": "{{error_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "WebSocket Connections",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "websocket_connections_active",
+          "legendFormat": "{{type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "OCPP Message Rate",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(ocpp_messages_total[5m])) by (message_type, protocol_version)",
+          "legendFormat": "{{message_type}} ({{protocol_version}})"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate (5m avg)",
+      "gridPos": { "x": 0, "y": 28, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(application_errors_total[5m]))",
+          "legendFormat": "errors/s"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Simulator Up",
+      "gridPos": { "x": 6, "y": 28, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "min(up{job=\"simulator\"})",
+          "legendFormat": "simulator"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}

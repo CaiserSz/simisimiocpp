@@ -1,6 +1,29 @@
 version: '3.8'
 
 services:
+  mock-csms:
+    image: node:20-alpine
+    container_name: ev_simulator_mock_csms
+    working_dir: /app/server
+    command: ["node", "src/mock/index.js"]
+    volumes:
+      - ./server:/app/server
+    environment:
+      - NODE_ENV=production
+      - MOCK_CSMS_PORT=9220
+      - MOCK_CSMS_HOST=0.0.0.0
+      - MOCK_CSMS_CONTROL_PORT=9320
+    ports:
+      - "9220:9220"
+      - "9320:9320"
+    networks:
+      - ev_simulator_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Redis for caching only
   redis:
     image: redis:alpine
@@ -39,7 +62,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your_super_secure_jwt_secret}
       - JWT_EXPIRES_IN=24h
       - REDIS_URL=redis://redis:6379
-      - CSMS_URL=${CSMS_URL:-ws://localhost:9220}
+      - CSMS_URL=${CSMS_URL:-ws://mock-csms:9220}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=1000
@@ -52,6 +75,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      mock-csms:
+        condition: service_started
     networks:
       - ev_simulator_network
     healthcheck:

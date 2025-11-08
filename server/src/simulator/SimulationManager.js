@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import CacheManager, { CacheKeys } from '../services/CacheManager.js';
 import BackupService from '../services/backup.service.js';
 import logger from '../utils/logger.js';
+import metricsCollector from '../middleware/metrics.js';
 import { StationSimulator } from './StationSimulator.js';
 
 /**
@@ -934,6 +935,7 @@ export class SimulationManager extends EventEmitter {
                 station.updateHealthScore();
             }
         }, 30000);
+        this.healthCheckInterval.unref ? .();
     }
 
     /**
@@ -951,6 +953,7 @@ export class SimulationManager extends EventEmitter {
                 logger.error('Periodic backup failed:', error);
             }
         }, 3600000); // 1 hour
+        this.backupInterval.unref ? .();
     }
 
     /**
@@ -1071,6 +1074,9 @@ export class SimulationManager extends EventEmitter {
         this.statistics.activeStations = Array.from(this.stations.values())
             .filter(s => s.isOnline).length;
 
+        // Update Prometheus metrics
+        this.updatePrometheusMetrics();
+
         // Protocol distribution
         this.statistics.protocolDistribution = {
             'OCPP 1.6J': 0,
@@ -1121,6 +1127,47 @@ export class SimulationManager extends EventEmitter {
 
         // Cache statistics
         CacheManager.set(CacheKeys.ANALYTICS_HOURLY(new Date().getHours()), this.statistics, 3600);
+    }
+
+    /**
+     * Update Prometheus metrics based on current station states
+     */
+    updatePrometheusMetrics() {
+        const stations = Array.from(this.stations.values());
+        
+        // Count stations by status
+        const statusCounts = {
+            online: 0,
+            offline: 0,
+            charging: 0,
+            available: 0,
+            error: 0
+        };
+
+        for (const station of stations) {
+            if (station.isOnline) {
+                statusCounts.online++;
+                if (station.status === 'Charging') {
+                    statusCounts.charging++;
+                } else if (station.status === 'Available') {
+                    statusCounts.available++;
+                }
+            } else {
+                statusCounts.offline++;
+            }
+            
+            // Check for errors
+            if (station.status === 'Error' || station.status === 'Faulted') {
+                statusCounts.error++;
+            }
+        }
+
+        // Update Prometheus gauges
+        metricsCollector.recordOCPPStation('online', statusCounts.online);
+        metricsCollector.recordOCPPStation('offline', statusCounts.offline);
+        metricsCollector.recordOCPPStation('charging', statusCounts.charging);
+        metricsCollector.recordOCPPStation('available', statusCounts.available);
+        metricsCollector.recordOCPPStation('error', statusCounts.error);
     }
 
     /**
@@ -1191,11 +1238,13 @@ export class SimulationManager extends EventEmitter {
             }
 
             // Create final backup
-            try {
-                await this.backupService.createBackup('shutdown');
-                logger.info('✅ Final backup created');
-            } catch (error) {
-                logger.error('Failed to create final backup:', error);
+            if (this.backupService ? .backupState) {
+                try {
+                    await this.backupService.backupState(this, { trigger: 'shutdown' });
+                    logger.info('✅ Final backup created');
+                } catch (error) {
+                    logger.error('Failed to create final backup:', error);
+                }
             }
 
             logger.info('✅ Simulation Manager shutdown completed');

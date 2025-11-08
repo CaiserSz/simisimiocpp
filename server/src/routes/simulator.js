@@ -1,19 +1,17 @@
 import { Router } from 'express';
+import { param, body } from 'express-validator';
+import { USER_ROLES } from '../constants/user.constants.js';
 import * as simulatorController from '../controllers/simulator.controller.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { checkValidation } from '../validators/common.validator.js';
 import {
-    validateStationId,
     validateConnectorId,
     validateCreateStation,
-    validateUpdateStationConfig,
-    validateSwitchProtocol,
-    validateVehicleConnection,
     validateProfileId,
-    validateScenarioId,
-    validatePagination
+    validateStationId,
+    validateSwitchProtocol,
+    validateVehicleConnection
 } from '../validators/station.validator.js';
-import { checkValidation } from '../validators/common.validator.js';
-import { USER_ROLES } from '../constants/user.constants.js';
 
 const router = Router();
 
@@ -578,7 +576,7 @@ router.get('/realtime/stations', (req, res) => {
             currentPower: Math.round(c.currentPower),
             energyDelivered: Math.round(c.energyDelivered * 100) / 100,
             hasActiveTransaction: !!c.transaction,
-            vehicle: station.connectors.find(conn => conn.connectorId === c.connectorId) ? .vehicle || null
+            vehicle: station.connectors.find(conn => conn.connectorId === c.connectorId)?.vehicle || null
         })),
         location: station.config.location || 'unknown',
         vendor: station.config.vendor,

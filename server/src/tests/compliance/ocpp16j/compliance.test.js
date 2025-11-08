@@ -1,6 +1,5 @@
 import { jest } from '@jest/globals';
 import { OCPP16JSimulator } from '../../../simulator/protocols/OCPP16JSimulator.js';
-import { StationSimulator } from '../../../simulator/StationSimulator.js';
 
 /**
  * OCPP 1.6J Compliance Tests
@@ -12,21 +11,13 @@ import { StationSimulator } from '../../../simulator/StationSimulator.js';
 
 describe('OCPP 1.6J Compliance Tests', () => {
     let simulator;
-    let stationSimulator;
 
     beforeEach(() => {
-        stationSimulator = new StationSimulator({
+        simulator = new OCPP16JSimulator({
             stationId: 'TEST_OCPP16J_001',
-            ocppVersion: '1.6J',
-            csmsUrl: 'ws://localhost:9220'
+            csmsUrl: 'ws://mock-csms:9220'
         });
-        simulator = stationSimulator.ocppClient;
-    });
-
-    afterEach(async () => {
-        if (stationSimulator) {
-            await stationSimulator.stop();
-        }
+        simulator.isConnected = true;
     });
 
     describe('BootNotification', () => {
@@ -79,7 +70,7 @@ describe('OCPP 1.6J Compliance Tests', () => {
     });
 
     describe('Heartbeat', () => {
-        test('should send Heartbeat message correctly', async () => {
+        test('should send Heartbeat message correctly', async() => {
             const sendMessageSpy = jest.spyOn(simulator, 'sendMessage');
             sendMessageSpy.mockResolvedValue({ currentTime: new Date().toISOString() });
 
@@ -91,10 +82,10 @@ describe('OCPP 1.6J Compliance Tests', () => {
             sendMessageSpy.mockRestore();
         });
 
-        test('should respect heartbeat interval from BootNotification', async () => {
+        test('should respect heartbeat interval from BootNotification', async() => {
             const mockResponse = {
                 status: 'Accepted',
-                interval: 60 // 60 seconds
+                heartbeatInterval: 60 // 60 seconds
             };
 
             const sendMessageSpy = jest.spyOn(simulator, 'sendMessage');
@@ -109,13 +100,17 @@ describe('OCPP 1.6J Compliance Tests', () => {
     });
 
     describe('StatusNotification', () => {
-        test('should send StatusNotification for all connector states', async () => {
+        test('should send StatusNotification for all connector states', async() => {
             const states = ['Available', 'Preparing', 'Charging', 'SuspendingEV', 'SuspendingEVSE', 'Finishing', 'Reserved', 'Unavailable', 'Faulted'];
             const sendMessageSpy = jest.spyOn(simulator, 'sendMessage');
             sendMessageSpy.mockResolvedValue({});
 
             for (const state of states) {
-                await simulator.sendStatusNotification(1, state, 'NoError');
+                await simulator.sendStatusNotification({
+                    connectorId: 1,
+                    status: state,
+                    errorCode: 'NoError'
+                });
                 expect(sendMessageSpy).toHaveBeenCalledWith('StatusNotification', expect.objectContaining({
                     connectorId: 1,
                     status: state,
@@ -126,14 +121,18 @@ describe('OCPP 1.6J Compliance Tests', () => {
             sendMessageSpy.mockRestore();
         });
 
-        test('should include error code in StatusNotification', async () => {
+        test('should include error code in StatusNotification', async() => {
             const errorCodes = ['NoError', 'ConnectorLockFailure', 'EVCommunicationError', 'GroundFailure', 'HighTemperature', 'InternalError', 'LocalListConflict', 'OtherError', 'OverCurrentFailure', 'PowerMeterFailure', 'PowerSwitchFailure', 'ReaderFailure', 'ResetFailure', 'UnderVoltage', 'OverVoltage', 'WeakSignal'];
             
             const sendMessageSpy = jest.spyOn(simulator, 'sendMessage');
             sendMessageSpy.mockResolvedValue({});
 
             for (const errorCode of errorCodes) {
-                await simulator.sendStatusNotification(1, 'Faulted', errorCode);
+                await simulator.sendStatusNotification({
+                    connectorId: 1,
+                    status: 'Faulted',
+                    errorCode
+                });
                 expect(sendMessageSpy).toHaveBeenCalledWith('StatusNotification', expect.objectContaining({
                     errorCode: errorCode
                 }));
@@ -324,4 +323,3 @@ describe('OCPP 1.6J Compliance Tests', () => {
         });
     });
 });
-

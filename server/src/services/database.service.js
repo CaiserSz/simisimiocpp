@@ -1,5 +1,5 @@
 import userRepository from '../repositories/user.repository.js';
-import logger from './logger.js';
+import logger from '../utils/logger.js';
 
 /**
  * Database Service - Lightweight Database Manager

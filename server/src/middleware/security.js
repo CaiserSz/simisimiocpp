@@ -118,9 +118,9 @@ export const createRateLimiter = (options = {}) => {
         ...defaults,
         ...options,
         handler: (req, res) => {
-            const identifier = req.user ? .id ? `User ${req.user.id}` : `IP ${req.ip}`;
+            const identifier = req.user?.id ? `User ${req.user.id}` : `IP ${req.ip}`;
             logger.warn(`Rate limit exceeded for ${identifier}`, {
-                userId: req.user ? .id,
+                userId: req.user?.id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent'),
                 url: req.originalUrl,
@@ -330,7 +330,7 @@ export const validateApiKey = (req, res, next) => {
 
     // Here you would validate against your API key database
     // For now, we'll just check against environment variable
-    const validApiKeys = process.env.VALID_API_KEYS ? .split(',') || [];
+    const validApiKeys = process.env.VALID_API_KEYS?.split(',') || [];
 
     if (!validApiKeys.includes(apiKey)) {
         logger.warn(`Invalid API key attempt from IP: ${req.ip}`);
@@ -424,7 +424,7 @@ export const logSecurityEvent = (event, req, additional = {}) => {
         url: req.originalUrl,
         method: req.method,
         timestamp: new Date().toISOString(),
-        userId: req.user ? .id,
+        userId: req.user?.id,
         ...additional
     });
 };

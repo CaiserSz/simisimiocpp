@@ -61,17 +61,25 @@ export class CircuitBreaker extends EventEmitter {
         }
 
         // Execute the function
+        const operation = Promise.resolve().then(() => fn(...args));
+        let timeoutId;
+
         try {
-            const result = await Promise.race([
-                fn(...args),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Operation timeout')), this.timeout)
-                )
-            ]);
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error('Operation timeout')), this.timeout);
+            });
+
+            const result = await Promise.race([operation, timeoutPromise]);
+
+            clearTimeout(timeoutId);
 
             this.onSuccess();
             return result;
         } catch (error) {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+
             this.onFailure(error);
             throw error;
         }

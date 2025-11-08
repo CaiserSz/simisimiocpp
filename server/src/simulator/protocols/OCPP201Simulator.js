@@ -35,7 +35,7 @@ export class OCPP201Simulator extends BaseOCPPSimulator {
             'NetworkProfileConnectionRetryBackOffRepeatTimes': { value: '2' },
             'NetworkProfileConnectionRetryBackOffWaitMinimum': { value: '5' },
             // Heartbeat
-            'HeartbeatInterval': { value: config.heartbeatInterval ? .toString() || '300' },
+            'HeartbeatInterval': { value: config.heartbeatInterval?.toString() || '300' },
 
             // Authorization
             'AuthCtrlrEnabled': { value: 'true' },
@@ -292,6 +292,13 @@ export class OCPP201Simulator extends BaseOCPPSimulator {
      */
     async sendTransactionEvent(payload) {
         return await this.sendMessage('TransactionEvent', payload);
+    }
+
+    /**
+     * Send MeterValues
+     */
+    async sendMeterValues(payload) {
+        return await this.sendMessage('MeterValues', payload);
     }
 
     /**

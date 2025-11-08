@@ -2,8 +2,8 @@ import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import WebSocket from 'ws';
 import metricsCollector from '../../middleware/metrics.js';
-import logger from '../../utils/logger.js';
 import circuitBreakerManager from '../../utils/circuitBreaker.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Base OCPP Simulator Class
@@ -36,7 +36,7 @@ export class BaseOCPPSimulator extends EventEmitter {
         this.connectionState = 'disconnected'; // disconnected, connecting, connected, reconnecting, failed
         this.lastConnectionError = null;
         this.reconnectBackoffMultiplier = 1; // Exponential backoff multiplier
-        
+
         // Circuit breaker for CSMS connection
         this.circuitBreaker = circuitBreakerManager.getBreaker(`ocpp-${this.stationId}`, {
             failureThreshold: 5,
@@ -44,13 +44,14 @@ export class BaseOCPPSimulator extends EventEmitter {
             timeout: 30000,
             resetTimeout: 60000
         });
-        
+        this.circuitBreaker.setMaxListeners ? .(20);
+
         // Listen to circuit breaker events
         this.circuitBreaker.on('open', () => {
             logger.warn(`🔴 Circuit breaker opened for ${this.stationId} - CSMS unavailable`);
             this.emit('circuitBreakerOpen', { stationId: this.stationId });
         });
-        
+
         this.circuitBreaker.on('closed', () => {
             logger.info(`🟢 Circuit breaker closed for ${this.stationId} - CSMS recovered`);
             this.emit('circuitBreakerClosed', { stationId: this.stationId });
@@ -184,12 +185,13 @@ export class BaseOCPPSimulator extends EventEmitter {
                 });
 
                 // Connection timeout
-                setTimeout(() => {
+                const connectionTimeout = setTimeout(() => {
                     if (!this.isConnected) {
                         this.ws.close();
                         reject(new Error('Connection timeout'));
                     }
                 }, 10000); // 10 seconds
+                connectionTimeout.unref ? .();
 
             } catch (error) {
                 logger.error('Failed to create WebSocket connection:', error);
@@ -281,6 +283,7 @@ export class BaseOCPPSimulator extends EventEmitter {
                 }
             }
         }, delay);
+        this.reconnectTimer.unref ? .();
     }
 
     /**
@@ -327,6 +330,8 @@ export class BaseOCPPSimulator extends EventEmitter {
                 const latency = (Date.now() - pendingRequest.startTime) / 1000;
                 const protocolVersion = this.getProtocolVersion();
                 metricsCollector.recordOCPPLatency(pendingRequest.action, protocolVersion, latency);
+                // Record successful message
+                metricsCollector.recordOCPPMessage(pendingRequest.action, 'success', protocolVersion);
             }
 
             pendingRequest.resolve(payload);
@@ -344,6 +349,11 @@ export class BaseOCPPSimulator extends EventEmitter {
         const pendingRequest = this.pendingRequests.get(messageId);
         if (pendingRequest) {
             this.pendingRequests.delete(messageId);
+            // Record failed message
+            const protocolVersion = this.getProtocolVersion();
+            if (pendingRequest.action) {
+                metricsCollector.recordOCPPMessage(pendingRequest.action, 'failure', protocolVersion);
+            }
             const error = new Error(errorDescription || errorCode);
             error.code = errorCode;
             error.details = errorDetails;
@@ -356,7 +366,7 @@ export class BaseOCPPSimulator extends EventEmitter {
      */
     async sendMessage(action, payload) {
         // Use circuit breaker to protect against CSMS failures
-        return await this.circuitBreaker.execute(async () => {
+        return await this.circuitBreaker.execute(async() => {
             return new Promise((resolve, reject) => {
                 if (!this.isConnected) {
                     reject(new Error('Not connected to CSMS'));
@@ -369,6 +379,9 @@ export class BaseOCPPSimulator extends EventEmitter {
                 const protocolVersion = this.getProtocolVersion();
 
                 logger.debug(`📤 Sending OCPP ${protocolVersion} message: ${action}`, payload);
+
+                // Record OCPP message metric
+                metricsCollector.recordOCPPMessage(action, 'sent', protocolVersion);
 
                 try {
                     this.ws.send(JSON.stringify(message));

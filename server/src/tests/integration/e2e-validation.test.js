@@ -6,14 +6,17 @@
  * Purpose: Ensure complete system works end-to-end
  */
 
-describe('End-to-End Validation', () => {
+const runE2ESuite = process.env.E2E_TESTS === 'true';
+const describeOrSkip = runE2ESuite ? describe : describe.skip;
+
+describeOrSkip('End-to-End Validation', () => {
     let simulationManager;
     let stationId;
     const CSMS_URL = process.env.CSMS_URL || 'ws://localhost:9220';
 
     beforeAll(async() => {
         const { simulationManager: manager } = await
-        import ('../../../controllers/simulator.controller.js');
+        import ('../../controllers/simulator.controller.js');
         simulationManager = manager;
     });
 
@@ -182,10 +185,10 @@ describe('End-to-End Validation', () => {
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             expect(station.isRunning).toBe(true);
-            expect(station.ocppClient ? .isConnected).toBe(true);
+            expect(station.ocppClient?.isConnected).toBe(true);
 
             // Simulate CSMS disconnection
-            if (station.ocppClient ? .ws) {
+            if (station.ocppClient?.ws) {
                 station.ocppClient.ws.close();
             }
 

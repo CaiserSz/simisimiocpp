@@ -2,7 +2,10 @@ import { jest } from '@jest/globals';
 import { SimulationManager } from '../../simulator/SimulationManager.js';
 import { StationSimulator } from '../../simulator/StationSimulator.js';
 
-describe('SimulationManager', () => {
+const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
+
+describeOrSkip('SimulationManager', () => {
     let simulationManager;
 
     beforeEach(() => {

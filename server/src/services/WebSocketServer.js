@@ -195,7 +195,7 @@ class WebSocketServer {
      * Handle station subscription
      */
     handleStationSubscription(socket, data) {
-        const { stationId } = data;
+        const stationId = typeof data === 'string' ? data : data?.stationId;
 
         if (!stationId) {
             socket.emit('error', { message: 'Station ID is required' });
@@ -216,6 +216,11 @@ class WebSocketServer {
         // Send current station status from simulator
         try {
             const station = simulationManager.getStation(stationId);
+            socket.emit('subscription:confirmed', {
+                stationId,
+                type: 'station',
+                timestamp: new Date().toISOString()
+            });
             socket.emit('station:status', {
                 stationId,
                 data: station ? station.getStatus() : null,
@@ -233,7 +238,10 @@ class WebSocketServer {
      * Handle station unsubscription
      */
     handleStationUnsubscription(socket, data) {
-        const { stationId } = data;
+        const stationId = typeof data === 'string' ? data : data?.stationId;
+        if (!stationId) {
+            return;
+        }
         const roomName = `station:${stationId}`;
 
         socket.leave(roomName);
@@ -243,6 +251,12 @@ class WebSocketServer {
         }
 
         logger.debug(`Client ${socket.id} unsubscribed from ${roomName}`);
+
+        socket.emit('subscription:removed', {
+            stationId,
+            type: 'station',
+            timestamp: new Date().toISOString()
+        });
     }
 
     /**
@@ -453,6 +467,16 @@ class WebSocketServer {
     /**
      * Broadcast message to station subscribers
      */
+    broadcastStationEvent(stationId, eventName, data = {}) {
+        const normalizedEvent = eventName.includes(':') ?
+            eventName :
+            eventName.replace(/([A-Z])/g, ':$1').toLowerCase();
+        this.broadcastToStation(stationId, normalizedEvent, data);
+    }
+
+    /**
+     * Broadcast message to station subscribers
+     */
     broadcastToStation(stationId, event, data) {
         this.io.to(`station:${stationId}`).emit(event, {
             stationId,
@@ -485,6 +509,60 @@ class WebSocketServer {
         });
         // Record metrics
         metricsCollector.recordWSMessage(event, 'sent');
+    }
+
+    broadcastDashboardUpdate(data) {
+        const payload = {
+            ...data,
+            timestamp: data?.timestamp || new Date().toISOString()
+        };
+        this.io.to('dashboard').emit('dashboard:update', payload);
+        metricsCollector.recordWSMessage('dashboard:update', 'sent');
+    }
+
+    broadcastMetricsUpdate(metrics) {
+        const payload = metrics?.metrics ? metrics.metrics : metrics;
+        this.io.to('dashboard').emit('metrics:update', {
+            ...payload,
+            timestamp: (payload && payload.timestamp) || new Date().toISOString()
+        });
+        metricsCollector.recordWSMessage('metrics:update', 'sent');
+    }
+
+    broadcastChargingEvent(eventName, data) {
+        const event = eventName.includes(':') ?
+            eventName :
+            eventName.replace(/([A-Z])/g, ':$1').toLowerCase();
+        const payload = {
+            ...data,
+            timestamp: data?.timestamp || new Date().toISOString()
+        };
+        if (data?.stationId) {
+            this.broadcastToStation(data.stationId, event, payload);
+        }
+        this.io.emit(event, payload);
+        metricsCollector.recordWSMessage(event, 'sent');
+    }
+
+    broadcastMeterValues(data) {
+        const payload = {
+            ...data,
+            timestamp: data?.timestamp || new Date().toISOString()
+        };
+        if (data?.stationId) {
+            this.broadcastToStation(data.stationId, 'meter:values', payload);
+        }
+        this.io.emit('meter:values', payload);
+        metricsCollector.recordWSMessage('meter:values', 'sent');
+    }
+
+    broadcastNotification(notification) {
+        const payload = {
+            ...notification,
+            timestamp: notification?.timestamp || new Date().toISOString()
+        };
+        this.io.emit('notification', payload);
+        metricsCollector.recordWSMessage('notification', 'sent');
     }
 
     /**
@@ -653,35 +731,13 @@ class WebSocketServer {
     // This duplicate was removed - use the one above that properly integrates with simulation manager
 
     /**
-     * Broadcast station update to dashboard
-     */
-    broadcastStationUpdate(stationId, updateData) {
-        this.io.to('dashboard').emit('station:update', {
-            type: 'station_update',
-            stationId,
-            update: updateData,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    /**
-     * Broadcast metrics update to dashboard
-     */
-    broadcastMetricsUpdate(metrics) {
-        this.io.to('dashboard').emit('metrics:update', {
-            type: 'metrics_update',
-            metrics,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    /**
      * Start periodic dashboard updates
      */
     startDashboardUpdates() {
-        setInterval(() => {
+        this.dashboardUpdateInterval = setInterval(() => {
             this.sendDashboardUpdate();
         }, 15000); // Update every 15 seconds (reduced from 5s to prevent event loop lag)
+        this.dashboardUpdateInterval.unref?.();
     }
 }
 

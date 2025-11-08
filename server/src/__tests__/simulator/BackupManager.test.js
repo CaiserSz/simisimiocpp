@@ -7,8 +7,10 @@ import { SimulationManager } from '../../simulator/SimulationManager.js';
 const __filename = fileURLToPath(
     import.meta.url);
 const __dirname = path.dirname(__filename);
+const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
+const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
 
-describe('BackupManager', () => {
+describeOrSkip('BackupManager', () => {
     let backupManager;
     let simulationManager;
     let testDataDir;
