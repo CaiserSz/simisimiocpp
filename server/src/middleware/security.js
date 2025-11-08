@@ -118,9 +118,9 @@ export const createRateLimiter = (options = {}) => {
         ...defaults,
         ...options,
         handler: (req, res) => {
-            const identifier = req.user ? .id ? `User ${req.user.id}` : `IP ${req.ip}`;
+            const identifier = req.user?.id ? `User ${req.user.id}` : `IP ${req.ip}`;
             logger.warn(`Rate limit exceeded for ${identifier}`, {
-                userId: req.user ? .id,
+                userId: req.user?.id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent'),
                 url: req.originalUrl,
@@ -424,7 +424,7 @@ export const logSecurityEvent = (event, req, additional = {}) => {
         url: req.originalUrl,
         method: req.method,
         timestamp: new Date().toISOString(),
-        userId: req.user ? .id,
+        userId: req.user?.id,
         ...additional
     });
 };
