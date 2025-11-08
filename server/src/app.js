@@ -43,14 +43,13 @@ import { simulationManager } from './controllers/simulator.controller.js';
 // Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
 let swaggerSetup = null;
 try {
-    const swaggerModule = await
-    import ('./config/swagger.js');
+    const swaggerModule = await import('./config/swagger.js');
     swaggerSetup = swaggerModule.default || swaggerModule.swaggerSetup;
 } catch (error) {
     logger.warn('Swagger packages not installed. Install with: npm install swagger-jsdoc swagger-ui-express');
 }
 
-// Conditional auth import (only when authentication enabled)
+// Conditional auth import(only when authentication enabled)
 let authRouter = null;
 
 // Setup global error handlers
@@ -200,7 +199,7 @@ app.use('/api/v1/simulator', apiVersionMiddleware, simulatorRouter);
 app.use('/api/v1/dashboard', apiVersionMiddleware, dashboardRouter);
 
 // Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
-import ('./config/swagger.js').then(async(swaggerModule) => {
+import('./config/swagger.js').then(async(swaggerModule) => {
     const swaggerSetup = swaggerModule.swaggerSetup || swaggerModule.default;
     if (swaggerSetup) {
         await swaggerSetup(app);
@@ -213,7 +212,7 @@ import ('./config/swagger.js').then(async(swaggerModule) => {
 // Conditional auth routes (only when authentication enabled)
 if (config.security.enableAuth) {
     logger.info('🔒 Authentication enabled - mounting auth routes');
-    import ('./routes/auth.js').then(({ default: authRoutes }) => {
+    import('./routes/auth.js').then(({ default: authRoutes }) => {
         app.use('/api/v1/auth', apiVersionMiddleware, authRoutes);
         logger.info('✅ Auth routes mounted');
     }).catch(err => {
@@ -257,8 +256,7 @@ app.get('/health/performance', async(req, res) => {
 // Tracing summary endpoint
 app.get('/health/tracing', async(req, res) => {
     try {
-        const { tracer } = await
-        import ('./utils/tracing.js');
+        const { tracer } = await import('./utils/tracing.js');
         const summary = tracer.getSummary();
         res.json({
             success: true,
@@ -276,8 +274,7 @@ app.get('/health/tracing', async(req, res) => {
 // Log aggregation endpoint
 app.get('/health/logs', async(req, res) => {
     try {
-        const { logAggregator } = await
-        import ('./utils/logAggregation.js');
+        const { logAggregator } = await import('./utils/logAggregation.js');
         const { traceId, level, startTime, endTime } = req.query;
 
         const logs = logAggregator.getAggregatedLogs({
@@ -315,8 +312,7 @@ app.get('/health/detailed', async(req, res) => {
             wsServer.getStatistics() : { error: 'WebSocket not initialized' };
 
         // Get circuit breaker status
-        const circuitBreakerManager = (await
-            import ('./utils/circuitBreaker.js')).default;
+        const circuitBreakerManager = (await import('./utils/circuitBreaker.js')).default;
         const circuitBreakers = circuitBreakerManager.getAllBreakers();
 
         const health = {
@@ -430,10 +426,9 @@ const startServer = async() => {
 
                     // Shutdown Cache Manager
                     try {
-                        const cacheManagerModule = await
-                        import ('./services/CacheManager.js');
+                        const cacheManagerModule = await import('./services/CacheManager.js');
                         const cacheManagerInstance = cacheManagerModule.default;
-                        if (cacheManagerInstance ? .shutdown) {
+                        if (cacheManagerInstance?.shutdown) {
                             await cacheManagerInstance.shutdown();
                             logger.info('💾 Cache Manager shut down');
                         }
