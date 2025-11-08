@@ -2,47 +2,115 @@ groups:
   - name: simulator-alerts
     interval: 30s
     rules:
+      # Critical Alerts
       - alert: SimulatorDown
         expr: up{job="simulator"} == 0
         for: 2m
         labels:
           severity: critical
+          component: simulator
         annotations:
           summary: "Simulator service is down"
-          description: "Prometheus cannot reach the simulator /health/metrics endpoint."
+          description: "Prometheus cannot reach the simulator /health/metrics endpoint for more than 2 minutes."
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#simulator-down"
 
       - alert: HighErrorRate
-        expr: rate(application_errors_total[5m]) > 5
+        expr: rate(application_errors_total[5m]) > 10
         for: 5m
         labels:
-          severity: warning
+          severity: critical
+          component: simulator
         annotations:
           summary: "Elevated application error rate"
-          description: "Error counter exceeded 5 events per minute over the last 5 minutes."
+          description: "Error counter exceeded 10 events per minute over the last 5 minutes. Current rate: {{ $value }} errors/s"
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#high-error-rate"
 
+      # Warning Alerts
       - alert: HighLatency
         expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
         for: 5m
         labels:
           severity: warning
+          component: simulator
         annotations:
           summary: "95th percentile HTTP latency above 1s"
-          description: "Investigate slow endpoints or backend dependencies."
+          description: "95th percentile HTTP latency is {{ $value }}s. Investigate slow endpoints or backend dependencies."
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#high-latency"
 
       - alert: CsmsMessageFailures
         expr: sum(rate(ocpp_messages_total{status="failure"}[5m])) > 1
         for: 5m
         labels:
           severity: warning
+          component: ocpp
         annotations:
           summary: "OCPP message failure rate above threshold"
-          description: "The CSMS is reporting failed OCPP messages at a rate greater than 1 per second."
+          description: "The CSMS is reporting failed OCPP messages at a rate greater than 1 per second. Current rate: {{ $value }} failures/s"
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#csms-message-failures"
 
       - alert: NoActiveStations
         expr: sum(ocpp_stations_total{status="online"}) == 0
         for: 10m
         labels:
           severity: warning
+          component: simulator
         annotations:
           summary: "No stations are currently online"
           description: "All simulated stations report offline or faulted status for the last 10 minutes."
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#no-active-stations"
+
+      - alert: HighOcppLatency
+        expr: histogram_quantile(0.95, sum(rate(ocpp_message_latency_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: ocpp
+        annotations:
+          summary: "High OCPP message latency"
+          description: "95th percentile OCPP message latency is {{ $value }}s. This may indicate CSMS connectivity issues."
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#high-ocpp-latency"
+
+      - alert: LowChargingSessionRate
+        expr: rate(charging_sessions_active[5m]) < 0.01
+        for: 15m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Low charging session activity"
+          description: "Charging session rate is below expected threshold. Current rate: {{ $value }} sessions/s"
+          runbook_url: "https://github.com/your-org/simulator/wiki/Runbook#low-charging-session-rate"
+
+      # Info Alerts
+      - alert: StationStatusChange
+        expr: changes(ocpp_stations_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          component: simulator
+        annotations:
+          summary: "Station status changed"
+          description: "Station status has changed in the last 5 minutes."
+
+  - name: simulator-capacity-alerts
+    interval: 60s
+    rules:
+      - alert: HighStationCount
+        expr: sum(ocpp_stations_total) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: capacity
+        annotations:
+          summary: "High number of simulated stations"
+          description: "Total number of stations ({{ $value }}) exceeds recommended limit of 1000."
+
+      - alert: HighWebSocketConnections
+        expr: sum(websocket_connections_active) > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: capacity
+        annotations:
+          summary: "High number of WebSocket connections"
+          description: "Total WebSocket connections ({{ $value }}) exceeds recommended limit of 500."
