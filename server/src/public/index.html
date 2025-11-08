@@ -496,7 +496,7 @@
                     } else if (response.status === 401) {
                         this.showToast('Warning', 'Authentication required - please login', 'warning');
                     } else {
-                        throw new Error(data.error ? .message || data.error || 'Failed to create station');
+                        throw new Error(data.error?.message || data.error || 'Failed to create station');
                     }
                 } catch (error) {
                     console.error('Error creating station:', error);
