@@ -75,9 +75,10 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https:", "https://cdn.jsdelivr.net"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https:", "https://cdn.jsdelivr.net"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:", "https://cdn.jsdelivr.net", "https://cdn.socket.io"],
+            scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "ws:", "wss:", "https:"],
+            connectSrc: ["'self'", "ws:", "wss:", "https:", "http://localhost:3001", "ws://localhost:3001"],
             fontSrc: ["'self'", "https:", "https://cdn.jsdelivr.net"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
