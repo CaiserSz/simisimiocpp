@@ -63,7 +63,7 @@ npm start
 |---------|-------------|----------------|
 | HTTP health | `GET http://localhost:3001/health` | `{ status: "ok", ... }` |
 | Gelişmiş health | `GET http://localhost:3001/health/detailed` | Servis bileşen detayları |
-| Prometheus metrics | `GET http://localhost:3001/metrics` | Prometheus metrik metni |
+| Prometheus metrics | `![1762689419586](image/CSMS_DEPLOYMENT_RUNBOOK/1762689419586.png)` | Prometheus metrik metni |
 | Dashboard health | Dashboard üstündeki bağlantı rozeti “Connected” |
 | Telemetri | Konsolda `[DashboardTelemetry]` logları (retry sonuçları) |
 
