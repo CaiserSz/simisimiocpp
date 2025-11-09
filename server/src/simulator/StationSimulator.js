@@ -77,7 +77,15 @@ export class StationSimulator extends EventEmitter {
 
         // Auto-start if enabled
         if (this.config.autoStart) {
-            this.start();
+            this.start().catch((error) => {
+                logger.error(`❌ Auto-start failed for ${this.stationId}:`, error);
+                this.status = 'Faulted';
+                this.recordError({
+                    type: 'startup_error',
+                    message: error.message,
+                    severity: 'critical'
+                });
+            });
         }
 
         logger.info(`🔌 Station Simulator created: ${this.stationId} (${this.config.ocppVersion})`);
@@ -121,17 +129,23 @@ export class StationSimulator extends EventEmitter {
             // Initialize OCPP client based on version
             await this.initializeOCPPClient();
 
-            // Connect to CSMS
-            await this.connectToCSMS();
+            // Connect to CSMS (returns false if connection fails but fallback allowed)
+            const connected = await this.connectToCSMS();
 
             // Start periodic updates
             this.startPeriodicUpdates();
 
-            this.status = 'Available';
-            this.isOnline = true;
+            if (connected) {
+                this.status = 'Available';
+                this.isOnline = true;
+                logger.info(`✅ Station simulator started: ${this.stationId}`);
+            } else {
+                this.status = 'Unavailable';
+                this.isOnline = false;
+                logger.warn(`⚠️ Station ${this.stationId} started in offline mode (CSMS connection failed)`);
+            }
 
-            logger.info(`✅ Station simulator started: ${this.stationId}`);
-            this.emit('started', { stationId: this.stationId });
+            this.emit('started', { stationId: this.stationId, online: this.isOnline });
 
         } catch (error) {
             logger.error(`❌ Failed to start station simulator ${this.stationId}:`, error);
@@ -353,7 +367,32 @@ export class StationSimulator extends EventEmitter {
             throw new Error('OCPP client not initialized');
         }
 
-        await this.ocppClient.connect();
+        try {
+            await this.ocppClient.connect();
+            return true;
+        } catch (error) {
+            logger.error(`❌ OCPP ${this.config.ocppVersion} WebSocket error for ${this.stationId}:`, error);
+            this.metrics.errorCount++;
+
+            this.recordError({
+                type: 'csms_connection',
+                message: error.message,
+                severity: 'warning',
+                stack: error.stack
+            });
+
+            this.emit('csmsConnectionFailed', {
+                stationId: this.stationId,
+                csmsUrl: this.config.csmsUrl,
+                error: error.message
+            });
+
+            if (this.config.failOnCSMSConnection) {
+                throw error;
+            }
+
+            return false;
+        }
     }
 
     /**
