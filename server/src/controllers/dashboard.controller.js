@@ -1,7 +1,6 @@
 import { asyncHandler } from '../utils/errorHandler.js';
 import { simulationManager } from './simulator.controller.js';
-import CacheManager, { CacheKeys } from '../services/CacheManager.js';
-import logger from '../utils/logger.js';
+import CacheManager from '../services/CacheManager.js';
 
 /**
  * Real-time Dashboard API Controller

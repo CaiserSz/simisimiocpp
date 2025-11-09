@@ -9,7 +9,6 @@ export default {
 
     // Parallelization configuration
     maxWorkers: process.env.CI ? '50%' : '75%', // Use 75% of CPU cores in local, 50% in CI
-    runInBand: false, // Enable parallelization for faster execution
 
     // Test isolation and cleanup
     resetMocks: true,

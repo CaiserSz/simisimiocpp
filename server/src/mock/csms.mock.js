@@ -280,7 +280,7 @@ export class MockCsmsServer {
      */
     initializeConnectionState(stationId) {
         if (!this.connectionStates.has(stationId)) {
-            this.connectionStates.set(stationId, {...this.defaultConnectionState });
+            this.connectionStates.set(stationId, { ...this.defaultConnectionState });
         }
     }
 

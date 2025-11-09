@@ -1,5 +1,4 @@
 import logger from '../utils/logger.js';
-import config from '../config/config.js';
 
 /**
  * API Versioning Middleware
@@ -151,7 +150,7 @@ export const versionedRoute = (routeHandler) => {
 /**
  * Setup API versioning
  */
-export const setupApiVersioning = (app) => {
+export const setupApiVersioning = () => {
     logger.info('📋 Setting up API versioning', {
         supportedVersions: SUPPORTED_VERSIONS,
         defaultVersion: DEFAULT_VERSION,
@@ -169,4 +168,3 @@ export default {
     DEFAULT_VERSION,
     CURRENT_VERSION
 };
-

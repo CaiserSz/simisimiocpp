@@ -943,7 +943,7 @@ export class StationSimulator extends EventEmitter {
     getHistory(options = {}) {
         const { type = 'all', limit = 100, startDate, endDate } = options;
 
-        let data = {};
+        const data = {};
 
         if (type === 'all' || type === 'sessions') {
             data.sessions = this.history.sessions
@@ -1030,7 +1030,7 @@ export class StationSimulator extends EventEmitter {
     }
 
     updateConfiguration(newConfig) {
-        this.config = {...this.config, ...newConfig };
+        this.config = { ...this.config, ...newConfig };
         logger.info(`⚙️ Configuration updated for station ${this.stationId}`);
         this.emit('configurationUpdated', { stationId: this.stationId, config: this.config });
     }

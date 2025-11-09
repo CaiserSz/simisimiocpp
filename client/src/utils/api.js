@@ -8,7 +8,11 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v1';
+const API_BASE_URL = `${API_HOST.replace(/\/$/, '')}${API_PREFIX}`;
+
+const AUTH_STORAGE_KEY = 'evsim_auth_token';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -22,7 +26,7 @@ export const apiClient = axios.create({
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(AUTH_STORAGE_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -41,7 +45,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('token');
+      localStorage.removeItem(AUTH_STORAGE_KEY);
       window.location.href = '/login';
     }
     return Promise.reject(error.response?.data || error);
@@ -53,6 +57,8 @@ export const api = {
   // Auth
   login: (email, password) =>
     apiClient.post('/auth/login', { email, password }),
+  fetchSession: () =>
+    apiClient.get('/auth/session'),
   register: (userData) =>
     apiClient.post('/auth/register', userData),
   logout: () =>
@@ -82,4 +88,3 @@ export const api = {
   getMetrics: () =>
     apiClient.get('/dashboard/metrics'),
 };
-

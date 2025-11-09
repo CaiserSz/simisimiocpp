@@ -2,7 +2,17 @@ import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
-// Mock userRepository BEFORE importing authController
+// Mock configuration and repositories BEFORE importing controller
+const mockConfig = {
+    security: {
+        enableAuth: true,
+        jwtSecret: 'test-secret',
+        passwordSaltRounds: 10,
+        jwtExpiresIn: '24h',
+        jwtCookieExpiresIn: 1
+    }
+};
+
 const mockUserRepository = {
     initialize: jest.fn(),
     create: jest.fn(),
@@ -17,13 +27,16 @@ const mockUserRepository = {
     healthCheck: jest.fn()
 };
 
+jest.unstable_mockModule('../../../config/config.js', () => ({
+    default: mockConfig
+}));
+
 jest.unstable_mockModule('../../../repositories/user.repository.js', () => ({
     default: mockUserRepository
 }));
 
-// Now import after mock
-const authController = await
-import ('../../../controllers/auth.controller.js');
+// Import controller after mocks are defined
+const authController = await import('../../../controllers/auth.controller.js');
 
 const app = express();
 app.use(express.json());
@@ -38,6 +51,16 @@ app.put('/updatepassword', authController.updatePassword);
 app.get('/users', authController.getAllUsers);
 app.post('/backup', authController.createBackup);
 app.get('/info', authController.getSystemInfo);
+app.get('/session', (req, res, next) => {
+    if (req.headers['x-test-user']) {
+        try {
+            req.user = JSON.parse(req.headers['x-test-user']);
+        } catch {
+            // ignore malformed test payloads
+        }
+    }
+    next();
+}, authController.getSession);
 
 describe('Auth Controller (JSON Storage)', () => {
     beforeEach(() => {
@@ -48,6 +71,7 @@ describe('Auth Controller (JSON Storage)', () => {
                 fn.mockClear();
             }
         });
+        mockConfig.security.enableAuth = true;
     });
 
     describe('POST /register', () => {
@@ -591,6 +615,65 @@ describe('Auth Controller (JSON Storage)', () => {
             expect(response.body.data.defaultCredentials).toBe('hidden');
 
             process.env.NODE_ENV = originalEnv;
+        });
+    });
+
+    describe('GET /session', () => {
+        test('should report authenticated demo session when auth disabled', async() => {
+            mockConfig.security.enableAuth = false;
+
+            const response = await request(app)
+                .get('/session')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.authEnabled).toBe(false);
+            expect(response.body.data.authenticated).toBe(true);
+            expect(response.body.data.user).toMatchObject({
+                role: 'admin',
+                username: 'Development Mode'
+            });
+        });
+
+        test('should return unauthenticated state when auth enabled without user', async() => {
+            mockConfig.security.enableAuth = true;
+
+            const response = await request(app)
+                .get('/session')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.authEnabled).toBe(true);
+            expect(response.body.data.authenticated).toBe(false);
+            expect(response.body.data.user).toBeUndefined();
+        });
+
+        test('should sanitize user object when authenticated', async() => {
+            mockConfig.security.enableAuth = true;
+
+            const mockUser = {
+                id: 'user-123',
+                username: 'operator',
+                email: 'operator@example.com',
+                role: 'operator',
+                password: 'secret'
+            };
+
+            const response = await request(app)
+                .get('/session')
+                .set('x-test-user', JSON.stringify(mockUser))
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.authEnabled).toBe(true);
+            expect(response.body.data.authenticated).toBe(true);
+            expect(response.body.data.user).toMatchObject({
+                id: 'user-123',
+                username: 'operator',
+                email: 'operator@example.com',
+                role: 'operator'
+            });
+            expect(response.body.data.user.password).toBeUndefined();
         });
     });
 });

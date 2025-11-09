@@ -283,7 +283,7 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
         } else {
             // Return requested keys
             for (const key of requestedKeys) {
-                if (this.configuration.hasOwnProperty(key)) {
+                if (Object.prototype.hasOwnProperty.call(this.configuration, key)) {
                     configurationKey.push({
                         key,
                         readonly: this.isReadOnlyKey(key),
@@ -304,7 +304,7 @@ export class OCPP16JSimulator extends BaseOCPPSimulator {
     handleChangeConfiguration(payload) {
         const { key, value } = payload;
 
-        if (!this.configuration.hasOwnProperty(key)) {
+        if (!Object.prototype.hasOwnProperty.call(this.configuration, key)) {
             return { status: 'NotSupported' };
         }
 

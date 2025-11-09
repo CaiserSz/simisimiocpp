@@ -414,7 +414,7 @@ export const simulateVehicleConnection = asyncHandler(async(req, res) => {
     }
 
     try {
-        const vehicle = await station.vehicleSimulator.connectVehicle(parseInt(connectorId), options);
+        await station.vehicleSimulator.connectVehicle(parseInt(connectorId), options);
 
         res.json({
             success: true,

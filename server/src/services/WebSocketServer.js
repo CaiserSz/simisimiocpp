@@ -170,7 +170,7 @@ class WebSocketServer {
 
         // Handle ping-pong for connection health
         socket.on('ping', (data) => {
-            socket.emit('pong', {...data, serverTime: Date.now() });
+            socket.emit('pong', { ...data, serverTime: Date.now() });
         });
     }
 
@@ -264,7 +264,7 @@ class WebSocketServer {
      */
     async handleStationCommand(socket, data) {
         try {
-            const { stationId, command, params = {} } = data;
+            const { stationId, command, params: _params = {} } = data;
 
             // Input validation
             if (!stationId || !command) {

@@ -7,52 +7,56 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { ensureDashboardAuthenticated } from './utils/auth.js';
 
-test.describe('Station Creation', () => {
+test.describe.serial('Station Creation', () => {
+    let stationId;
+
     test('should create a new station', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
-        // Fill station creation form
-        await page.fill('input[placeholder*="Station ID"]', 'E2E_TEST_001');
-        await page.selectOption('select', '1.6J');
-        await page.fill('input[placeholder*="Vendor"]', 'E2E_Vendor');
-        await page.fill('input[placeholder*="Max Power"]', '22');
+        stationId = `E2E_STATION_${Date.now()}`;
 
-        // Submit form
-        await page.click('button:has-text("Create & Start")');
+        await page.fill('#station-id', stationId);
+        await page.selectOption('#ocpp-version', '1.6J');
+        await page.fill('#vendor', 'E2E_Vendor');
+        await page.fill('#max-power', '22');
 
-        // Wait for success toast
-        await expect(page.locator('text=Station created successfully')).toBeVisible({
-            timeout: 5000,
-        });
+        await page.click('button:has-text("Create & Start Station")');
 
-        // Verify station appears in grid
-        await expect(page.locator('text=E2E_TEST_001')).toBeVisible();
+        const toast = page.locator('text=Station created successfully');
+        await expect(toast).toBeVisible({ timeout: 10000 });
+
+        const stationCard = page.locator('.station-card').filter({ hasText: stationId });
+        await expect(stationCard).toBeVisible({ timeout: 10000 });
     });
 
-    test('should start a station', async({ page }) => {
+    test('should start the created station', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
-        // Find station and click start button
-        const stationCard = page.locator('.station-card').first();
-        await stationCard.locator('button:has-text("Start")').click();
+        const stationCard = page.locator('.station-card').filter({ hasText: stationId }).first();
+        await expect(stationCard).toBeVisible({ timeout: 10000 });
 
-        // Wait for success toast
-        await expect(page.locator('text=started successfully')).toBeVisible({
-            timeout: 5000,
+        await stationCard.locator('button.btn-outline-success').click();
+
+        await expect(page.locator('text=Station started successfully')).toBeVisible({
+            timeout: 8000,
         });
     });
 
-    test('should stop a station', async({ page }) => {
+    test('should stop the created station', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
-        // Find station and click stop button
-        const stationCard = page.locator('.station-card').first();
-        await stationCard.locator('button:has-text("Stop")').click();
+        const stationCard = page.locator('.station-card').filter({ hasText: stationId }).first();
+        await expect(stationCard).toBeVisible({ timeout: 10000 });
 
-        // Wait for success toast
-        await expect(page.locator('text=stopped successfully')).toBeVisible({
-            timeout: 5000,
+        await stationCard.locator('button.btn-outline-warning').click();
+
+        await expect(page.locator('text=Station stopped successfully')).toBeVisible({
+            timeout: 8000,
         });
     });
 });

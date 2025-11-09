@@ -180,7 +180,7 @@ class UserRepository {
 
     async getAllUsers() {
         await this.initialize();
-        return Array.from(this.users.values()).map(({ password, ...user }) => user);
+        return Array.from(this.users.values()).map(({ password: _password, ...user }) => user);
     }
 
     async updateById(id, updateData) {
@@ -248,7 +248,7 @@ class UserRepository {
         await this.saveUsers();
 
         // Return user without password
-        const { password, ...userWithoutPassword } = user;
+        const { password: _password, ...userWithoutPassword } = user;
         return userWithoutPassword;
     }
 
@@ -275,7 +275,7 @@ class UserRepository {
         await this.saveUsers();
 
         // Return user without password
-        const { password, ...userWithoutPassword } = updatedUser;
+        const { password: _password, ...userWithoutPassword } = updatedUser;
         return userWithoutPassword;
     }
 

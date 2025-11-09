@@ -206,15 +206,16 @@ export const simulatorRateLimit = createUserRateLimiter({
 export const adminRateLimit = createUserRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 5000, // 5000 requests per 15 minutes for admin users
-    skip: (req) => {
+    skip: (_req) => {
         // Only apply to admin users
-        return !(req.user && req.user.role === 'admin');
+        return !(_req.user && _req.user.role === 'admin');
     }
 });
 
 /**
  * Enhanced Helmet configuration
  */
+/* eslint-disable quotes */
 export const securityHeaders = helmet({
     contentSecurityPolicy: {
         directives: {
@@ -240,6 +241,7 @@ export const securityHeaders = helmet({
     xssFilter: true,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 });
+/* eslint-enable quotes */
 
 /**
  * Input validation helpers

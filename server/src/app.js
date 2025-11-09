@@ -40,18 +40,7 @@ import simulatorRouter from './routes/simulator.js';
 // Import SimulationManager for graceful shutdown
 import { simulationManager } from './controllers/simulator.controller.js';
 
-// Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
-let swaggerSetup = null;
-try {
-    const swaggerModule = await
-    import ('./config/swagger.js');
-    swaggerSetup = swaggerModule.default || swaggerModule.swaggerSetup;
-} catch (error) {
-    logger.warn('Swagger packages not installed. Install with: npm install swagger-jsdoc swagger-ui-express');
-}
-
-// Conditional auth import(only when authentication enabled)
-let authRouter = null;
+// Swagger documentation is loaded lazily below to avoid startup penalty when packages are missing.
 
 // Setup global error handlers
 handleUnhandledRejection();
@@ -70,6 +59,7 @@ initializePerformanceOptimizations(app);
 setupSecurity(app);
 
 // Security Middleware - Relaxed CSP for development dashboard
+/* eslint-disable quotes */
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -86,6 +76,7 @@ app.use(helmet({
     },
     crossOriginEmbedderPolicy: false,
 }));
+/* eslint-enable quotes */
 
 // CORS Configuration with enhanced validation
 const corsOptions = createCorsOptions();
@@ -205,7 +196,7 @@ app.get('/health/metrics/summary', async(req, res) => {
 
 // Mount API routes
 // Setup API versioning
-setupApiVersioning(app);
+setupApiVersioning();
 
 // Versioned API routes: /api/v1/*
 app.use('/api/v1', apiVersionMiddleware, apiRouter);
@@ -213,20 +204,20 @@ app.use('/api/v1/simulator', apiVersionMiddleware, simulatorRouter);
 app.use('/api/v1/dashboard', apiVersionMiddleware, dashboardRouter);
 
 // Swagger documentation (optional - requires swagger-jsdoc and swagger-ui-express)
-import ('./config/swagger.js').then(async(swaggerModule) => {
+import('./config/swagger.js').then(async(swaggerModule) => {
     const swaggerSetup = swaggerModule.swaggerSetup || swaggerModule.default;
     if (swaggerSetup) {
         await swaggerSetup(app);
         logger.info('📚 Swagger documentation available at /api/docs');
     }
-}).catch((error) => {
+}).catch(() => {
     logger.warn('Swagger packages not installed. Install with: npm install swagger-jsdoc swagger-ui-express');
 });
 
 // Conditional auth routes (only when authentication enabled)
 if (config.security.enableAuth) {
     logger.info('🔒 Authentication enabled - mounting auth routes');
-    import ('./routes/auth.js').then(({ default: authRoutes }) => {
+    import('./routes/auth.js').then(({ default: authRoutes }) => {
         app.use('/api/v1/auth', apiVersionMiddleware, authRoutes);
         logger.info('✅ Auth routes mounted');
     }).catch(err => {
@@ -271,7 +262,7 @@ app.get('/health/performance', async(req, res) => {
 app.get('/health/tracing', async(req, res) => {
     try {
         const { tracer } = await
-        import ('./utils/tracing.js');
+        import('./utils/tracing.js');
         const summary = tracer.getSummary();
         res.json({
             success: true,
@@ -290,7 +281,7 @@ app.get('/health/tracing', async(req, res) => {
 app.get('/health/logs', async(req, res) => {
     try {
         const { logAggregator } = await
-        import ('./utils/logAggregation.js');
+        import('./utils/logAggregation.js');
         const { traceId, level, startTime, endTime } = req.query;
 
         const logs = logAggregator.getAggregatedLogs({
@@ -329,7 +320,7 @@ app.get('/health/detailed', async(req, res) => {
 
         // Get circuit breaker status
         const circuitBreakerManager = (await
-            import ('./utils/circuitBreaker.js')).default;
+            import('./utils/circuitBreaker.js')).default;
         const circuitBreakers = circuitBreakerManager.getAllBreakers();
 
         const health = {
@@ -444,7 +435,7 @@ const startServer = async() => {
                     // Shutdown Cache Manager
                     try {
                         const cacheManagerModule = await
-                        import ('./services/CacheManager.js');
+                        import('./services/CacheManager.js');
                         const cacheManagerInstance = cacheManagerModule.default;
                         if (cacheManagerInstance?.shutdown) {
                             await cacheManagerInstance.shutdown();

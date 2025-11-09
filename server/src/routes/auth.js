@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { USER_ROLES } from '../constants/user.constants.js';
 import * as authController from '../controllers/auth.controller.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, optionalAuth } from '../middleware/auth.js';
 import {
     validateLogin,
     validateRegistration,
@@ -113,6 +113,7 @@ router.post('/register', validateRegistration, checkValidation, authController.r
 router.post('/login', validateLogin, checkValidation, authController.login);
 router.get('/logout', authController.logout);
 router.get('/info', authController.getSystemInfo);
+router.get('/session', optionalAuth, authController.getSession);
 
 /**
  * @swagger

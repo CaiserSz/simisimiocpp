@@ -60,7 +60,7 @@ export const authenticate = async (req, res, next) => {
       }
       
       // Remove password from user object
-      const { password, ...userWithoutPassword } = user;
+      const { password: _password, ...userWithoutPassword } = user;
       
       // Add user to request object
       req.user = userWithoutPassword;
@@ -158,7 +158,7 @@ export const optionalAuth = async (req, res, next) => {
         const user = await userRepository.findById(decoded.id);
         
         if (user && user.isActive) {
-          const { password, ...userWithoutPassword } = user;
+        const { password: _password, ...userWithoutPassword } = user;
           req.user = userWithoutPassword;
         }
       } catch (error) {

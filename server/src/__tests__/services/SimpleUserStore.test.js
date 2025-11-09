@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-// @deprecated: Using userRepository instead of SimpleUserStore
+import SimpleUserStore from '../../services/SimpleUserStore.js';
 
 const __dirname = path.dirname(fileURLToPath(
     import.meta.url));
@@ -11,15 +11,11 @@ const describeOrSkip = runFunctionalSuite ? describe : describe.skip;
 describeOrSkip('SimpleUserStore', () => {
     let userStore;
     let testDataDir;
-    let originalUsersFile;
 
     beforeAll(async() => {
         // Create test data directory
         testDataDir = path.join(__dirname, '../../../test-data');
         await fs.mkdir(testDataDir, { recursive: true });
-
-        // Store original users file path
-        originalUsersFile = userStore?.usersFile;
     });
 
     beforeEach(async() => {

@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { SimulationManager } from '../../simulator/SimulationManager.js';
 
 const runFunctionalSuite = process.env.SIM_FUNCTIONAL_TESTS === 'true';
@@ -105,7 +104,7 @@ describeOrSkip('Health Monitoring & Batch Operations', () => {
         });
 
         test('should get stations by health status', async() => {
-            const healthyStation = await simulationManager.createStation({
+            await simulationManager.createStation({
                 stationId: 'HEALTHY_STATION',
                 vendor: 'TestVendor',
                 model: 'TestModel',
@@ -295,7 +294,7 @@ describeOrSkip('Health Monitoring & Batch Operations', () => {
 
     describe('Station Cloning', () => {
         test('should clone station successfully', async() => {
-            const sourceStation = await simulationManager.createStation({
+            await simulationManager.createStation({
                 stationId: 'SOURCE_STATION',
                 vendor: 'TestVendor',
                 model: 'TestModel',
@@ -316,7 +315,7 @@ describeOrSkip('Health Monitoring & Batch Operations', () => {
         });
 
         test('should clone station with overrides', async() => {
-            const sourceStation = await simulationManager.createStation({
+            await simulationManager.createStation({
                 stationId: 'SOURCE_STATION_2',
                 vendor: 'TestVendor',
                 model: 'TestModel',
@@ -335,7 +334,7 @@ describeOrSkip('Health Monitoring & Batch Operations', () => {
         });
 
         test('should generate unique station ID if not provided', async() => {
-            const sourceStation = await simulationManager.createStation({
+            await simulationManager.createStation({
                 stationId: 'SOURCE_STATION_3',
                 vendor: 'TestVendor',
                 model: 'TestModel',

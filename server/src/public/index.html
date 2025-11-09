@@ -83,11 +83,23 @@
                 <i class="bi bi-lightning-charge"></i>
                 EV Station Simulator
             </span>
-            <div class="d-flex align-items-center">
-                <span class="badge bg-success me-3" id="connection-status">
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-success" id="connection-status">
                     <i class="bi bi-wifi"></i> Connected
                 </span>
-                <button class="btn btn-outline-light btn-sm" onclick="refreshData()">
+                <div class="d-flex align-items-center gap-2" id="auth-controls">
+                    <span class="badge bg-light text-dark d-none" id="user-badge">
+                        <i class="bi bi-person-circle"></i>
+                        <span id="user-name">Guest</span>
+                    </span>
+                    <button class="btn btn-outline-light btn-sm" id="login-btn">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </button>
+                    <button class="btn btn-outline-light btn-sm d-none" id="logout-btn">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </div>
+                <button class="btn btn-outline-light btn-sm" id="refresh-btn">
                     <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
             </div>
@@ -103,6 +115,10 @@
     </div>
 
     <div class="container-fluid mt-4">
+        <div class="alert alert-warning d-none" id="permission-alert" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Dashboard erişimi için giriş yapmanız gerekiyor.
+        </div>
         <!-- System Overview -->
         <div class="row mb-4">
             <div class="col-md-3">
@@ -227,320 +243,563 @@
     <!-- Toast Container -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container"></div>
 
-    <script>
+    <!-- Login Modal -->
+    <div class="modal fade" id="login-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>
+                        Dashboard Girişi
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="login-form" class="needs-validation" novalidate>
+                    <div class="modal-body">
+                        <div class="alert alert-danger d-none" id="login-error"></div>
+                        <div class="mb-3">
+                            <label for="login-email" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="login-email" name="email" required autocomplete="username">
+                        </div>
+                        <div class="mb-3">
+                            <label for="login-password" class="form-label">Şifre</label>
+                            <input type="password" class="form-control" id="login-password" name="password" required autocomplete="current-password">
+                        </div>
+                        <div class="form-text">
+                            Varsayılan kimlik bilgileri için <code>/api/auth/info</code> endpoint'ine göz atabilirsiniz.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">İptal</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="spinner-border spinner-border-sm d-none" id="login-spinner" role="status" aria-hidden="true"></span>
+                            <span class="ms-2">Giriş Yap</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import DashboardUtils from '/dashboard/js/dashboard-utils.js';
+        import DashboardApi from '/dashboard/js/api-client.js';
         class EVSimulatorDashboard {
             constructor() {
-                console.log('🚀 Initializing EV Simulator Dashboard...');
-
                 this.ws = null;
-                this.stations = new Map();
-                this.metrics = {
-                    power: [],
-                    energy: [],
-                    sessions: []
-                };
                 this.chart = null;
+                this.stations = new Map();
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
+                this.apiMaxRetries = DashboardApi.DEFAULT_MAX_RETRIES;
 
-                this.initializeWebSocket();
+                this.authEnabled = false;
+                this.authenticated = false;
+                this.currentUser = null;
+                this.authToken = null;
+
+                this.loginModalElement = document.getElementById('login-modal');
+                this.loginModal = this.loginModalElement ? new bootstrap.Modal(this.loginModalElement, { backdrop: 'static' }) : null;
+                this.loginForm = document.getElementById('login-form');
+                this.loginButton = document.getElementById('login-btn');
+                this.logoutButton = document.getElementById('logout-btn');
+                this.loginError = document.getElementById('login-error');
+                this.loginSpinner = document.getElementById('login-spinner');
+                this.userBadge = document.getElementById('user-badge');
+                this.userName = document.getElementById('user-name');
+                this.permissionAlert = document.getElementById('permission-alert');
+                this.stationForm = document.getElementById('station-form');
+                this.csrfToken = null;
+                this.ensureCsrfToken();
+
+                this.bootstrap();
+            }
+
+            async bootstrap() {
                 this.initializeChart();
-                this.loadStations();
                 this.setupEventListeners();
+                await this.checkSession();
+                this.updateAuthUI();
+                this.setStationFormState(this.canManageSimulator());
+                this.togglePermissionAlert();
 
-                // Add test button for debugging
-                this.addDebugButton();
+                if (this.authEnabled && !this.authenticated) {
+                    this.requireLogin('Dashboard erişimi için giriş yapmanız gerekiyor.');
+                    return;
+                }
 
-                console.log('✅ Dashboard initialization complete');
+                await this.afterAuthentication();
+            }
+
+            async afterAuthentication() {
+                this.setStationFormState(this.canManageSimulator());
+                this.togglePermissionAlert();
+                this.initializeWebSocket();
+                await this.loadStations();
+            }
+
+            async checkSession() {
+                try {
+                    const response = await fetch('/api/auth/session', { credentials: 'include' });
+                    if (!response.ok) {
+                        throw new Error(`Session status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    this.authEnabled = Boolean(data.authEnabled);
+                    this.authenticated = Boolean(data.authenticated);
+                    this.currentUser = data.user || null;
+
+                    if (this.authEnabled && this.authenticated) {
+                        this.authToken = window.localStorage.getItem('evsim_auth_token') || null;
+                    } else {
+                        this.authToken = null;
+                        window.localStorage.removeItem('evsim_auth_token');
+                    }
+                } catch (error) {
+                    console.warn('Session kontrolü başarısız:', error);
+                    this.authEnabled = true;
+                    this.authenticated = false;
+                    this.currentUser = null;
+                    this.authToken = null;
+                }
+            }
+            getCookieValue(name) {
+                const cookie = document.cookie.split('; ').find((row) => row.startsWith(`${name}=`));
+                return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
+            }
+
+            async ensureCsrfToken(force = false) {
+                if (!force) {
+                    const cookieToken = this.getCookieValue('XSRF-TOKEN');
+                    if (cookieToken) {
+                        this.csrfToken = cookieToken;
+                        return this.csrfToken;
+                    }
+                }
+
+                try {
+                    const response = await fetch('/api/csrf-token', {
+                        credentials: 'include',
+                        headers: { 'Cache-Control': 'no-cache' },
+                    });
+                    if (!response.ok) {
+                        throw new Error(`CSRF token request failed (${response.status})`);
+                    }
+                    const data = await response.json().catch(() => ({}));
+                    this.csrfToken = data?.csrfToken || this.getCookieValue('XSRF-TOKEN');
+                } catch (error) {
+                    console.warn('CSRF token alınamadı:', error);
+                }
+
+                return this.csrfToken;
+            }
+
+            setupEventListeners() {
+                if (this.loginButton && this.loginModal) {
+                    this.loginButton.addEventListener('click', () => {
+                        this.clearLoginFeedback();
+                        this.loginModal.show();
+                        document.getElementById('login-email')?.focus();
+                    });
+                }
+
+                if (this.logoutButton) {
+                    this.logoutButton.addEventListener('click', () => this.logout());
+                }
+
+                if (this.loginForm) {
+                    this.loginForm.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        const email = event.target.email.value.trim();
+                        const password = event.target.password.value;
+                        this.performLogin(email, password);
+                    });
+                }
+
+                if (this.stationForm) {
+                    this.stationForm.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        if (!this.canManageSimulator()) {
+                            this.showToast('Yetki', 'İstasyon oluşturmak için operatör veya admin rolü gerekir.', 'warning');
+                            return;
+                        }
+
+                        const maxPowerKw = parseFloat(document.getElementById('max-power').value) || 0;
+                        const formData = {
+                            stationId: document.getElementById('station-id').value.trim(),
+                            vendor: document.getElementById('vendor').value.trim(),
+                            model: 'SimulatorModel',
+                            ocppVersion: document.getElementById('ocpp-version').value,
+                            maxPower: Math.max(1, Math.round(maxPowerKw * 1000)),
+                            connectorCount: 2,
+                            csmsUrl: document.getElementById('csms-url').value.trim(),
+                            autoStart: true
+                        };
+
+                        this.createStation(formData);
+                    });
+                }
+
+                const refreshButton = document.getElementById('refresh-btn');
+                if (refreshButton) {
+                    refreshButton.addEventListener('click', () => this.loadStations());
+                }
+            }
+
+            clearLoginFeedback() {
+                if (this.loginError) {
+                    this.loginError.classList.add('d-none');
+                    this.loginError.textContent = '';
+                }
+                if (this.loginSpinner) {
+                    this.loginSpinner.classList.add('d-none');
+                }
+            }
+
+            showLoginError(message) {
+                if (this.loginError) {
+                    this.loginError.textContent = message;
+                    this.loginError.classList.remove('d-none');
+                } else {
+                    this.showToast('Giriş Hatası', message, 'danger');
+                }
+            }
+
+            async performLogin(email, password) {
+                if (!email || !password) {
+                    this.showLoginError('E-posta ve şifre zorunludur.');
+                    return;
+                }
+
+                const submitButton = this.loginForm?.querySelector('button[type="submit"]');
+                submitButton?.setAttribute('disabled', 'disabled');
+                this.loginSpinner?.classList.remove('d-none');
+                this.clearLoginFeedback();
+
+                try {
+                    const csrfToken = await this.ensureCsrfToken();
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(csrfToken ? { 'X-XSRF-TOKEN': csrfToken } : {}),
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    let data = null;
+                    try {
+                        data = await response.json();
+                    } catch (parseError) {
+                        console.warn('Login response parse error:', parseError);
+                    }
+
+                    if (!response.ok || !data?.success) {
+                        const errorMessage =
+                            data?.error?.message ||
+                            (typeof data?.error === 'string' ? data.error : null) ||
+                            data?.message ||
+                            `Giriş başarısız (HTTP ${response.status}).`;
+                        throw new Error(errorMessage);
+                    }
+
+                    this.authenticated = true;
+                    this.currentUser = data.user;
+                    this.authToken = data.token || null;
+
+                    if (this.authToken) {
+                        window.localStorage.setItem('evsim_auth_token', this.authToken);
+                    }
+
+                    this.updateAuthUI();
+                    this.setStationFormState(this.canManageSimulator());
+                    this.togglePermissionAlert();
+
+                    this.loginModal?.hide();
+                    this.showToast('Giriş', 'Başarıyla giriş yapıldı.', 'success');
+
+                    await this.ensureCsrfToken(true);
+                    await this.afterAuthentication();
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.showLoginError(error.message || 'Giriş yapılamadı.');
+                } finally {
+                    submitButton?.removeAttribute('disabled');
+                    this.loginSpinner?.classList.add('d-none');
+                    this.loginForm?.reset();
+                }
+            }
+
+            async logout() {
+                try {
+                    await fetch('/api/auth/logout', { credentials: 'include' });
+                } catch (error) {
+                    console.warn('Logout request failed:', error);
+                }
+
+                this.handleUnauthorized('Oturum kapatıldı.');
+            }
+
+            requireLogin(message) {
+                this.togglePermissionAlert(message);
+                this.setStationFormState(false);
+                if (this.loginModal) {
+                    this.clearLoginFeedback();
+                    this.loginModal.show();
+                }
+            }
+
+            updateAuthUI() {
+                if (!this.authEnabled) {
+                    this.userName && (this.userName.textContent = 'Demo Modu (Kimlik doğrulama kapalı)');
+                    this.userBadge?.classList.remove('d-none');
+                    this.loginButton?.classList.add('d-none');
+                    this.logoutButton?.classList.add('d-none');
+                    return;
+                }
+
+                if (this.authenticated && this.currentUser) {
+                    const label = `${this.currentUser.username || this.currentUser.email || 'Kullanıcı'} (${this.currentUser.role})`;
+                    if (this.userName) {
+                        this.userName.textContent = label;
+                    }
+                    this.userBadge?.classList.remove('d-none');
+                    this.loginButton?.classList.add('d-none');
+                    this.logoutButton?.classList.remove('d-none');
+                } else {
+                    this.userBadge?.classList.add('d-none');
+                    this.loginButton?.classList.remove('d-none');
+                    this.logoutButton?.classList.add('d-none');
+                }
+            }
+
+            togglePermissionAlert(message) {
+                if (!this.permissionAlert) {
+                    return;
+                }
+
+                let alertMessage = '';
+
+                if (!this.authEnabled) {
+                    this.permissionAlert.classList.add('d-none');
+                    return;
+                }
+
+                if (message) {
+                    alertMessage = message;
+                } else if (!this.authenticated) {
+                    alertMessage = 'Dashboard erişimi için giriş yapmanız gerekiyor.';
+                } else if (!this.canManageSimulator()) {
+                    alertMessage = 'Operatör veya admin rolüne sahip olmadığınız için istasyon kontrolü devre dışı bırakıldı.';
+                }
+
+                if (alertMessage) {
+                    this.permissionAlert.textContent = alertMessage;
+                    this.permissionAlert.classList.remove('d-none');
+                } else {
+                    this.permissionAlert.classList.add('d-none');
+                }
+            }
+
+            setStationFormState(enabled) {
+                if (!this.stationForm) {
+                    return;
+                }
+
+                Array.from(this.stationForm.elements).forEach((element) => {
+                    element.disabled = !enabled;
+                });
+
+                this.stationForm.classList.toggle('opacity-50', !enabled);
+            }
+
+            canManageSimulator() {
+                return DashboardUtils.canManageSimulator(
+                    this.authEnabled,
+                    this.authenticated,
+                    this.currentUser?.role
+                );
             }
 
             initializeWebSocket() {
-                console.log('🔌 Initializing Socket.IO connection...');
+                if (this.ws) {
+                    this.ws.disconnect();
+                    this.ws = null;
+                }
 
-                // Socket.IO connection (no authentication required for now)
-                this.ws = io({
+                if (this.authEnabled && !this.authenticated) {
+                    return;
+                }
+
+                const socketOptions = {
                     reconnection: true,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     transports: ['websocket', 'polling']
-                });
+                };
+
+                if (this.authEnabled && this.authToken) {
+                    socketOptions.auth = { token: this.authToken };
+                }
+
+                this.ws = io(socketOptions);
 
                 this.ws.on('connect', () => {
-                    console.log('✅ Socket.IO connected');
                     this.updateConnectionStatus(true);
                     this.reconnectAttempts = 0;
-
-                    // Subscribe to simulation events
                     this.ws.emit('subscribe:simulation', {});
                 });
 
-                this.ws.on('simulation:update', (data) => {
-                    console.log('Simulation update:', data);
-                    this.handleWebSocketMessage({
-                        type: 'system_stats',
-                        stats: data
-                    });
-                });
-
-                this.ws.on('station:update', (data) => {
-                    console.log('Station update:', data);
-                    this.handleWebSocketMessage({
-                        type: 'station_update',
-                        station: data
-                    });
-                });
-
-                this.ws.on('disconnect', (reason) => {
-                    console.log('Socket.IO disconnected:', reason);
+                this.ws.on('disconnect', () => {
                     this.updateConnectionStatus(false);
                 });
 
                 this.ws.on('connect_error', (error) => {
-                    console.error('Socket.IO connection error:', error);
+                    console.error('Socket connection error:', error);
                     this.updateConnectionStatus(false);
                 });
 
                 this.ws.on('error', (error) => {
-                    console.error('Socket.IO error:', error);
-                    this.showToast('Connection Error', 'Real-time updates unavailable', 'warning');
+                    console.error('Socket error:', error);
+                    this.showToast('Bağlantı', 'Gerçek zamanlı bağlantı kurulamadı.', 'warning');
+                });
+
+                this.ws.on('simulation:update', (data) => {
+                    this.handleWebSocketMessage({ type: 'system_stats', stats: data });
+                });
+
+                this.ws.on('station:update', (data) => {
+                    this.handleWebSocketMessage({ type: 'station_update', station: data });
                 });
             }
 
             updateConnectionStatus(connected) {
                 const statusBadge = document.getElementById('connection-status');
                 const connectionAlert = document.getElementById('connection-alert');
+                const spinner = connectionAlert?.querySelector('.loading-spinner');
 
                 if (connected) {
-                    statusBadge.className = 'badge bg-success me-3';
-                    statusBadge.innerHTML = '<i class="bi bi-wifi"></i> Connected';
-                    connectionAlert.classList.remove('show');
-                } else {
-                    statusBadge.className = 'badge bg-danger me-3';
-                    statusBadge.innerHTML = '<i class="bi bi-wifi-off"></i> Disconnected';
-                    connectionAlert.classList.add('show');
-                    document.querySelector('.loading-spinner').style.display = 'inline-block';
-                }
-            }
-
-            attemptReconnect() {
-                if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    this.reconnectAttempts++;
-                    console.log(`Reconnection attempt ${this.reconnectAttempts}`);
-                    setTimeout(() => this.initializeWebSocket(), 3000 * this.reconnectAttempts);
-                }
-            }
-
-            handleWebSocketMessage(data) {
-                switch (data.type) {
-                    case 'station_update':
-                        this.updateStation(data.station);
-                        break;
-                    case 'metrics_update':
-                        this.updateMetrics(data.metrics);
-                        break;
-                    case 'system_stats':
-                        this.updateSystemStats(data.stats);
-                        break;
-                    default:
-                        console.log('Unknown message type:', data.type);
-                }
-            }
-
-            async loadStations() {
-                try {
-                    console.log('Loading stations...');
-
-                    const response = await fetch('/api/simulator/stations');
-                    const data = await response.json();
-
-                    console.log('Stations API response:', data);
-
-                    // Handle different API response formats
-                    let stations = [];
-                    if (data.data && data.data.stations) {
-                        console.log('Found stations object:', data.data.stations);
-                        // Convert stations object to array
-                        stations = Object.values(data.data.stations);
-                    } else if (Array.isArray(data.data)) {
-                        stations = data.data;
+                    if (statusBadge) {
+                        statusBadge.className = 'badge bg-success';
+                        statusBadge.innerHTML = '<i class="bi bi-wifi"></i> Connected';
                     }
-
-                    console.log('Final stations array:', stations);
-                    this.renderStations(stations);
-                } catch (error) {
-                    console.error('Error loading stations:', error);
-                    this.showToast('Error', 'Failed to load stations', 'danger');
-                    // Show empty state on error
-                    this.renderStations([]);
+                    connectionAlert?.classList.remove('show');
+                    spinner && (spinner.style.display = 'none');
+                } else {
+                    if (statusBadge) {
+                        statusBadge.className = 'badge bg-danger';
+                        statusBadge.innerHTML = '<i class="bi bi-wifi-off"></i> Disconnected';
+                    }
+                    connectionAlert?.classList.add('show');
+                    spinner && (spinner.style.display = 'inline-block');
                 }
             }
 
-            renderStations(stations) {
-                const grid = document.getElementById('stations-grid');
-
-                if (stations.length === 0) {
-                    grid.innerHTML = `
-                        <div class="col-12 text-center py-5">
-                            <i class="bi bi-broadcast" style="font-size: 3rem; color: #ccc;"></i>
-                            <p class="mt-3 text-muted">No stations found. Create your first station!</p>
-                        </div>
-                    `;
+            handleWebSocketMessage(payload) {
+                if (!payload) {
                     return;
                 }
 
-                grid.innerHTML = stations.map(station => `
-                    <div class="col-md-4 col-lg-3 mb-3">
-                        <div class="card station-card ${station.isOnline ? 'online' : 'offline'}">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-0">${station.stationId}</h6>
-                                    <span class="badge ${station.isOnline ? 'bg-success' : 'bg-danger'}">
-                                        ${station.isOnline ? 'Online' : 'Offline'}
-                                    </span>
-                                </div>
-                                <p class="card-text small text-muted">
-                                    <strong>OCPP:</strong> ${station.config?.ocppVersion || 'N/A'}<br>
-                                    <strong>Power:</strong> ${station.config?.maxPower || 0} kW<br>
-                                    <strong>Connectors:</strong> ${station.connectors?.length || 0}
-                                </p>
-                                <div class="btn-group w-100" role="group">
-                                    <button class="btn btn-sm btn-outline-success" onclick="dashboard.controlStation('${station.stationId}', 'start')">
-                                        <i class="bi bi-play"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="dashboard.controlStation('${station.stationId}', 'stop')">
-                                        <i class="bi bi-stop"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="dashboard.controlStation('${station.stationId}', 'delete')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-                this.updateSystemOverview(stations);
-            }
-
-            updateSystemOverview(stations) {
-                const totalStations = stations.length;
-                const onlineStations = stations.filter(s => s.isOnline).length;
-                const chargingSessions = stations.reduce((sum, s) => sum + (s.activeConnectors || 0), 0);
-                const totalPower = stations.reduce((sum, s) => sum + (s.currentPower || 0), 0);
-
-                document.getElementById('total-stations').textContent = totalStations;
-                document.getElementById('online-stations').textContent = onlineStations;
-                document.getElementById('charging-sessions').textContent = chargingSessions;
-                document.getElementById('total-power').textContent = `${totalPower.toFixed(1)} kW`;
-            }
-
-            async controlStation(stationId, action) {
-                try {
-                    let url, method = 'PUT';
-
-                    switch (action) {
-                        case 'start':
-                            url = `/api/simulator/stations/${stationId}/start`;
-                            break;
-                        case 'stop':
-                            url = `/api/simulator/stations/${stationId}/stop`;
-                            break;
-                        case 'delete':
-                            url = `/api/simulator/stations/${stationId}`;
-                            method = 'DELETE';
-                            break;
-                        default:
-                            throw new Error('Invalid action');
-                    }
-
-                    const response = await fetch(url, {
-                        method
-                    });
-                    const data = await response.json();
-
-                    if (data.success) {
-                        this.showToast('Success', `Station ${action}ed successfully`, 'success');
-                        this.loadStations();
-                    } else {
-                        throw new Error(data.error || 'Operation failed');
-                    }
-                } catch (error) {
-                    console.error(`Error ${action}ing station:`, error);
-                    this.showToast('Error', error.message, 'danger');
+                switch (payload.type) {
+                    case 'station_update':
+                        this.updateStation(payload.station);
+                        break;
+                    case 'metrics_update':
+                        this.updateMetrics(payload.metrics);
+                        break;
+                    case 'system_stats':
+                        this.updateSystemStats(payload.stats);
+                        break;
+                    default:
+                        console.debug('Bilinmeyen WebSocket mesajı:', payload);
                 }
             }
 
-            async createStation(formData) {
-                try {
-                    console.log('Creating station with data:', formData);
+            updateStation(station) {
+                if (!station || !station.stationId) {
+                    return;
+                }
 
-                    const response = await fetch('/api/simulator/stations', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify(formData)
-                    });
+                this.stations.set(station.stationId, station);
+                this.renderStations(Array.from(this.stations.values()));
+            }
 
-                    console.log('Response status:', response.status);
-                    const data = await response.json();
-                    console.log('Response data:', data);
+            updateMetrics(metrics) {
+                if (!metrics) {
+                    return;
+                }
 
-                    if (response.ok && data.success) {
-                        this.showToast('Success', 'Station created successfully', 'success');
-                        // Reload stations after creation
-                        setTimeout(() => this.loadStations(), 1000);
-                        document.getElementById('station-form').reset();
-                    } else if (response.status === 401) {
-                        this.showToast('Warning', 'Authentication required - please login', 'warning');
-                    } else {
-                        throw new Error(data.error?.message || data.error || 'Failed to create station');
-                    }
-                } catch (error) {
-                    console.error('Error creating station:', error);
-                    this.showToast('Error', error.message, 'danger');
+                const totalPower = Number(metrics.totalPower ?? metrics.power ?? 0);
+                const activeSessions = Number(metrics.activeSessions ?? metrics.sessions ?? 0);
+                const chartPower = DashboardUtils.normalizePower(totalPower);
+
+                const totalPowerLabel = DashboardUtils.formatPower(totalPower);
+                document.getElementById('total-power').textContent = totalPowerLabel;
+                document.getElementById('charging-sessions').textContent = activeSessions;
+
+                if (this.chart) {
+                    this.updateChart(chartPower, activeSessions);
+                }
+            }
+
+            updateSystemStats(stats) {
+                if (!stats) {
+                    return;
+                }
+
+                document.getElementById('total-stations').textContent = stats.totalStations ?? stats.stationCount ?? '0';
+                document.getElementById('online-stations').textContent = stats.activeStations ?? stats.onlineStations ?? '0';
+
+                const activeSessions = stats.activeSessions ?? stats.sessions ?? 0;
+                document.getElementById('charging-sessions').textContent = activeSessions;
+
+                if (stats.totalPower !== undefined) {
+                    document.getElementById('total-power').textContent = DashboardUtils.formatPower(stats.totalPower);
                 }
             }
 
             initializeChart() {
-                const ctx = document.getElementById('metrics-chart').getContext('2d');
+                const canvas = document.getElementById('metrics-chart');
+                if (!canvas) {
+                    return;
+                }
+
+                const ctx = canvas.getContext('2d');
                 this.chart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: [],
-                        datasets: [{
-                            label: 'Total Power (kW)',
-                            data: [],
-                            borderColor: 'rgb(75, 192, 192)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                            tension: 0.1
-                        }, {
-                            label: 'Active Sessions',
-                            data: [],
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                            tension: 0.1,
-                            yAxisID: 'y1'
-                        }]
+                        datasets: [
+                            {
+                                label: 'Total Power (kW)',
+                                data: [],
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Active Sessions',
+                                data: [],
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                tension: 0.1,
+                                yAxisID: 'y1'
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                            },
+                            y: { type: 'linear', display: true, position: 'left' },
                             y1: {
                                 type: 'linear',
                                 display: true,
                                 position: 'right',
-                                grid: {
-                                    drawOnChartArea: false,
-                                },
+                                grid: { drawOnChartArea: false }
                             }
                         }
                     }
@@ -548,8 +807,11 @@
             }
 
             updateChart(power, sessions) {
-                const now = new Date().toLocaleTimeString();
+                if (!this.chart) {
+                    return;
+                }
 
+                const now = new Date().toLocaleTimeString();
                 if (this.chart.data.labels.length > 20) {
                     this.chart.data.labels.shift();
                     this.chart.data.datasets[0].data.shift();
@@ -562,60 +824,333 @@
                 this.chart.update('none');
             }
 
-            setupEventListeners() {
-                console.log('🔧 Setting up event listeners...');
-
-                const form = document.getElementById('station-form');
-                if (!form) {
-                    console.error('❌ Form not found: station-form');
+            async loadStations() {
+                if (this.authEnabled && !this.authenticated) {
                     return;
                 }
 
-                console.log('✅ Form found, adding submit listener');
+                try {
+                    const response = await this.apiFetch('/api/simulator/stations');
+                    const data = await response.json();
 
-                form.addEventListener('submit', (e) => {
-                    console.log('🚀 Form submitted!');
-                    e.preventDefault();
+                    let stations = [];
+                    if (Array.isArray(data)) {
+                        stations = data;
+                    } else if (Array.isArray(data.data)) {
+                        stations = data.data;
+                    } else if (data.data && typeof data.data === 'object') {
+                        stations = Object.values(data.data);
+                    }
 
-                    const formData = {
-                        stationId: document.getElementById('station-id').value,
-                        vendor: document.getElementById('vendor').value,
-                        model: 'SimulatorModel',
-                        ocppVersion: document.getElementById('ocpp-version').value,
-                        maxPower: parseInt(document.getElementById('max-power').value) * 1000, // Convert kW to W
-                        connectorCount: 2,
-                        csmsUrl: document.getElementById('csms-url').value,
-                        autoStart: true
-                    };
-
-                    console.log('📝 Form data prepared:', formData);
-                    this.createStation(formData);
-                });
-
-                console.log('✅ Event listeners setup complete');
+                    this.stations = new Map(stations.map((station) => [station.stationId, station]));
+                    this.renderStations(stations);
+                } catch (error) {
+                    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+                        return;
+                    }
+                    console.error('İstasyonlar yüklenirken hata:', error);
+                    this.renderStations([]);
+                    this.showToast('Hata', 'İstasyonlar yüklenemedi.', 'danger');
+                }
             }
 
-            addDebugButton() {
-                console.log('🔧 Adding debug button...');
+            renderStations(stations) {
+                const grid = document.getElementById('stations-grid');
+                if (!grid) {
+                    return;
+                }
 
-                // Create a test station immediately for debugging
-                setTimeout(() => {
-                    console.log('🧪 Creating test station for debugging...');
-                    const testData = {
-                        stationId: 'DEBUG_STATION_001',
-                        vendor: 'DebugVendor',
-                        model: 'SimulatorModel',
-                        ocppVersion: '2.0.1',
-                        maxPower: 22000,
-                        connectorCount: 2,
-                        csmsUrl: 'ws://localhost:9221',
-                        autoStart: false
-                    };
-                    this.createStation(testData);
-                }, 2000);
+                if (!Array.isArray(stations) || stations.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-broadcast" style="font-size: 3rem; color: #ccc;"></i>
+                            <p class="mt-3 text-muted mb-0">Henüz istasyon yok. Yeni bir istasyon oluşturabilirsiniz.</p>
+                        </div>
+                    `;
+                    this.updateSystemOverview([]);
+                    return;
+                }
+
+                const controlsDisabled = this.canManageSimulator() ? '' : 'disabled';
+
+                grid.innerHTML = stations.map((station) => {
+                    const powerLabel = DashboardUtils.formatPower(station.config?.maxPower);
+                    return `
+                    <div class="col-md-4 col-lg-3 mb-3">
+                        <div class="card station-card ${station.isOnline ? 'online' : 'offline'}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">${station.stationId}</h6>
+                                    <span class="badge ${station.isOnline ? 'bg-success' : 'bg-danger'}">
+                                        ${station.isOnline ? 'Online' : 'Offline'}
+                                    </span>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    <strong>OCPP:</strong> ${station.config?.ocppVersion || 'N/A'}<br>
+                                    <strong>Power:</strong> ${powerLabel}<br>
+                                    <strong>Connectors:</strong> ${station.connectors?.length || 0}
+                                </p>
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-sm btn-outline-success" ${controlsDisabled}
+                                        onclick="dashboard.controlStation('${station.stationId}', 'start')">
+                                        <i class="bi bi-play"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" ${controlsDisabled}
+                                        onclick="dashboard.controlStation('${station.stationId}', 'stop')">
+                                        <i class="bi bi-stop"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" ${controlsDisabled}
+                                        onclick="dashboard.controlStation('${station.stationId}', 'delete')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+
+                this.updateSystemOverview(stations);
+            }
+
+            updateSystemOverview(stations) {
+                const totalStations = stations.length;
+                const onlineStations = stations.filter((s) => s.isOnline).length;
+                const chargingSessions = stations.reduce((sum, s) => sum + (s.activeConnectors || 0), 0);
+                const totalPower = stations.reduce((sum, s) => sum + (s.currentPower || 0), 0);
+
+                document.getElementById('total-stations').textContent = totalStations;
+                document.getElementById('online-stations').textContent = onlineStations;
+                document.getElementById('charging-sessions').textContent = chargingSessions;
+                document.getElementById('total-power').textContent = DashboardUtils.formatPower(totalPower);
+            }
+
+            async controlStation(stationId, action) {
+                if (!this.canManageSimulator()) {
+                    this.showToast('Yetki', 'Bu işlem için izniniz yok.', 'warning');
+                    return;
+                }
+
+                let url = '';
+                let method = 'PUT';
+
+                switch (action) {
+                    case 'start':
+                        url = `/api/simulator/stations/${stationId}/start`;
+                        break;
+                    case 'stop':
+                        url = `/api/simulator/stations/${stationId}/stop`;
+                        break;
+                    case 'delete':
+                        url = `/api/simulator/stations/${stationId}`;
+                        method = 'DELETE';
+                        break;
+                    default:
+                        this.showToast('Hata', 'Geçersiz işlem.', 'danger');
+                        return;
+                }
+
+                try {
+                    const response = await this.apiFetch(url, { method });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showToast('Başarılı', `İstasyon ${action} işlemi tamamlandı.`, 'success');
+                        this.loadStations();
+                    } else {
+                        throw new Error(data.error || 'İşlem başarısız.');
+                    }
+                } catch (error) {
+                    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+                        return;
+                    }
+                    console.error(`Station ${action} error:`, error);
+                    this.showToast('Hata', error.message || 'İşlem gerçekleştirilemedi.', 'danger');
+                }
+            }
+
+            async createStation(formData) {
+                if (!this.canManageSimulator()) {
+                    this.showToast('Yetki', 'Bu işlem için izniniz yok.', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await this.apiFetch('/api/simulator/stations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        this.showToast('Başarılı', 'İstasyon oluşturuldu.', 'success');
+                        this.stationForm?.reset();
+                        setTimeout(() => this.loadStations(), 500);
+                    } else {
+                        throw new Error(data.error?.message || data.error || 'İstasyon oluşturulamadı.');
+                    }
+                } catch (error) {
+                    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+                        return;
+                    }
+                    console.error('Create station error:', error);
+                    this.showToast('Hata', error.message, 'danger');
+                }
+            }
+
+            async startAllStations() {
+                if (!this.canManageSimulator()) {
+                    this.showToast('Yetki', 'Tüm istasyonları başlatmak için yetkiniz yok.', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await this.apiFetch('/api/simulator/stations/start-all', { method: 'PUT' });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showToast('Başarılı', 'Tüm istasyonlar başlatıldı.', 'success');
+                        this.loadStations();
+                    }
+                } catch (error) {
+                    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+                        return;
+                    }
+                    this.showToast('Hata', 'İstasyonlar başlatılamadı.', 'danger');
+                }
+            }
+
+            async stopAllStations() {
+                if (!this.canManageSimulator()) {
+                    this.showToast('Yetki', 'Tüm istasyonları durdurmak için yetkiniz yok.', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await this.apiFetch('/api/simulator/stations/stop-all', { method: 'PUT' });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showToast('Başarılı', 'Tüm istasyonlar durduruldu.', 'warning');
+                        this.loadStations();
+                    }
+                } catch (error) {
+                    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+                        return;
+                    }
+                    this.showToast('Hata', 'İstasyonlar durdurulamadı.', 'danger');
+                }
+            }
+
+            async apiFetch(url, options = {}) {
+                const fetchOptions = {
+                    credentials: 'include',
+                    ...options,
+                };
+
+                fetchOptions.headers = {
+                    ...(options.headers || {}),
+                };
+
+                if (this.authEnabled && this.authToken && !fetchOptions.headers.Authorization) {
+                    fetchOptions.headers.Authorization = `Bearer ${this.authToken}`;
+                }
+
+                const csrfToken = await this.ensureCsrfToken();
+                if (csrfToken && !fetchOptions.headers['X-XSRF-TOKEN']) {
+                    fetchOptions.headers['X-XSRF-TOKEN'] = csrfToken;
+                }
+
+                const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                let retries = 0;
+
+                try {
+                    const response = await DashboardApi.fetchWithRetry(url, fetchOptions, {
+                        retries: this.apiMaxRetries ?? DashboardApi.DEFAULT_MAX_RETRIES,
+                        retryDelay: DashboardApi.DEFAULT_RETRY_DELAY,
+                        retryOn: DashboardApi.RETRYABLE_STATUS,
+                        onRetry: ({ attempt, response: retryResponse, error }) => {
+                            retries = attempt + 1;
+                            this.logRetryTelemetry('retry', {
+                                url,
+                                attempt: attempt + 1,
+                                status: retryResponse?.status,
+                                error: error?.message,
+                            });
+                        },
+                    });
+
+                    const duration = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startTime;
+
+                    if (response.status === 401) {
+                        this.handleUnauthorized('Oturum süreniz doldu, lütfen tekrar giriş yapın.');
+                        throw new Error('Unauthorized');
+                    }
+
+                    if (response.status === 403) {
+                        this.showToast('Yetki', 'Bu işlem için izniniz yok.', 'warning');
+                        throw new Error('Forbidden');
+                    }
+
+                    if (!response.ok && response.status >= 500) {
+                        throw new Error(`Server error (${response.status})`);
+                    }
+
+                    this.logRetryTelemetry('success', {
+                        url,
+                        status: response.status,
+                        retries,
+                        durationMs: Math.round(duration),
+                    });
+
+                    return response;
+                } catch (error) {
+                    const duration = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startTime;
+                    this.logRetryTelemetry('failure', {
+                        url,
+                        retries,
+                        durationMs: Math.round(duration),
+                        message: error?.message,
+                    });
+                    throw error;
+                }
+            }
+
+            handleUnauthorized(message) {
+                this.authenticated = false;
+                this.currentUser = null;
+                this.authToken = null;
+                this.csrfToken = null;
+                window.localStorage.removeItem('evsim_auth_token');
+                document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/';
+
+                if (this.ws) {
+                    this.ws.disconnect();
+                    this.ws = null;
+                }
+
+                this.updateAuthUI();
+                this.setStationFormState(false);
+                this.togglePermissionAlert(message);
+
+                if (message) {
+                    this.showToast('Oturum', message, 'warning');
+                }
+
+                if (this.loginModal) {
+                    this.clearLoginFeedback();
+                    this.loginModal.show();
+                }
             }
 
             showToast(title, message, type = 'info') {
+                const container = document.getElementById('toast-container');
+                if (!container) {
+                    return;
+                }
+
                 const toastHtml = `
                     <div class="toast align-items-center text-bg-${type} border-0" role="alert">
                         <div class="d-flex">
@@ -627,59 +1162,39 @@
                     </div>
                 `;
 
-                const toastContainer = document.getElementById('toast-container');
-                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
-                const toastElement = toastContainer.lastElementChild;
+                container.insertAdjacentHTML('beforeend', toastHtml);
+                const toastElement = container.lastElementChild;
                 const toast = new bootstrap.Toast(toastElement);
                 toast.show();
-
                 toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
             }
-        }
 
-        // Global functions
-        let dashboard;
+            logRetryTelemetry(event, details) {
+                const payload = {
+                    event,
+                    timestamp: new Date().toISOString(),
+                    ...details,
+                };
 
-        function refreshData() {
-            dashboard.loadStations();
-        }
-
-        async function startAllStations() {
-            try {
-                const response = await fetch('/api/simulator/stations/start-all', {
-                    method: 'PUT'
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    dashboard.showToast('Success', 'All stations started', 'success');
-                    dashboard.loadStations();
+                if (!window.__dashboardTelemetry) {
+                    window.__dashboardTelemetry = [];
                 }
-            } catch (error) {
-                dashboard.showToast('Error', 'Failed to start all stations', 'danger');
+                window.__dashboardTelemetry.push(payload);
+
+                const logFn = event === 'failure' ? console.error : console.info;
+                logFn('[DashboardTelemetry]', payload);
             }
         }
 
-        async function stopAllStations() {
-            try {
-                const response = await fetch('/api/simulator/stations/stop-all', {
-                    method: 'PUT'
-                });
-                const data = await response.json();
+        let dashboard = null;
 
-                if (data.success) {
-                    dashboard.showToast('Success', 'All stations stopped', 'warning');
-                    dashboard.loadStations();
-                }
-            } catch (error) {
-                dashboard.showToast('Error', 'Failed to stop all stations', 'danger');
-            }
-        }
-
-        // Initialize dashboard when page loads
         document.addEventListener('DOMContentLoaded', () => {
             dashboard = new EVSimulatorDashboard();
+
+            window.loadStations = () => dashboard?.loadStations();
+            window.refreshData = () => dashboard?.loadStations();
+            window.startAllStations = () => dashboard?.startAllStations();
+            window.stopAllStations = () => dashboard?.stopAllStations();
         });
     </script>
 </body>

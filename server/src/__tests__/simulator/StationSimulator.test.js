@@ -79,7 +79,7 @@ describeOrSkip('StationSimulator - Protocol Switching', () => {
 
         test('should switch from 2.0.1 to 1.6J', async() => {
             // Initialize with 2.0.1
-            const config2 = {...mockConfig, ocppVersion: '2.0.1' };
+            const config2 = { ...mockConfig, ocppVersion: '2.0.1' };
             const station2 = new StationSimulator(config2);
 
             // Switch to 1.6J

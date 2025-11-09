@@ -3,6 +3,7 @@ import { PASSWORD_REQUIREMENTS, USER_ROLES } from '../constants/user.constants.j
 import userRepository from '../repositories/user.repository.js';
 import logger from '../utils/logger.js';
 import { error, forbidden, notFound, success, unauthorized, validationError } from '../utils/response.js';
+import config from '../config/config.js';
 
 /**
  * Lightweight Auth Controller for EV Station Simulator
@@ -139,7 +140,7 @@ export const getMe = async(req, res) => {
         }
 
         // Remove password from response
-        const { password, ...userWithoutPassword } = user;
+        const { password: _password, ...userWithoutPassword } = user;
 
         return success(res, userWithoutPassword);
     } catch (err) {
@@ -281,5 +282,46 @@ export const getSystemInfo = async(req, res) => {
     } catch (err) {
         logger.error('Get system info error:', err);
         return error(res, 'Server error while fetching system info', HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    }
+};
+
+/**
+ * @desc    Get current session information
+ * @route   GET /api/auth/session
+ * @access  Public (uses optional auth)
+ */
+export const getSession = async(req, res) => {
+    try {
+        const authEnabled = config.security.enableAuth === true;
+
+        if (!authEnabled) {
+            return success(res, {
+                authEnabled: false,
+                authenticated: true,
+                user: {
+                    role: 'admin',
+                    username: 'Development Mode',
+                    permissions: ['simulator:manage', 'dashboard:view']
+                }
+            });
+        }
+
+        if (!req.user) {
+            return success(res, {
+                authEnabled: true,
+                authenticated: false
+            });
+        }
+
+        const { password: _password, ...userWithoutPassword } = req.user;
+
+        return success(res, {
+            authEnabled: true,
+            authenticated: true,
+            user: userWithoutPassword
+        });
+    } catch (err) {
+        logger.error('Get session info error:', err);
+        return error(res, 'Failed to determine session state', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
 };

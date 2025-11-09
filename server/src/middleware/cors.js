@@ -33,7 +33,7 @@ const validateOriginFormat = (origin) => {
         }
 
         // Validate hostname format (basic check)
-        const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+        const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
         if (!hostnamePattern.test(url.hostname)) {
             return {
                 valid: false,
@@ -174,12 +174,22 @@ export const corsValidation = (req, res, next) => {
     let isAllowed = false;
     let matchedOrigin = null;
 
+    const fallbackOrigins = [
+        `http://localhost:${config.port}`,
+        `http://127.0.0.1:${config.port}`,
+    ];
+
     for (const allowedOrigin of allowedOrigins) {
         if (matchesAllowedOrigin(origin, allowedOrigin)) {
             isAllowed = true;
             matchedOrigin = allowedOrigin;
             break;
         }
+    }
+
+    if (!isAllowed && fallbackOrigins.includes(origin)) {
+        isAllowed = true;
+        matchedOrigin = origin;
     }
 
     if (!isAllowed) {
@@ -218,6 +228,10 @@ export const createCorsOptions = () => {
     return {
         origin: (origin, callback) => {
             const allowedOrigins = config.cors.allowedOrigins || [];
+            const fallbackOrigins = [
+                `http://localhost:${config.port}`,
+                `http://127.0.0.1:${config.port}`,
+            ];
 
             // Allow requests with no origin
             if (!origin) {
@@ -243,6 +257,10 @@ export const createCorsOptions = () => {
                     isAllowed = true;
                     break;
                 }
+            }
+
+            if (!isAllowed && fallbackOrigins.includes(origin)) {
+                isAllowed = true;
             }
 
             if (!isAllowed) {

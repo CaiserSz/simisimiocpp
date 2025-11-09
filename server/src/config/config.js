@@ -179,7 +179,7 @@ const validateConfig = () => {
             const host = process.env.HOST.trim();
             // Basic host validation (IP address or hostname)
             const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-            const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+            const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
             if (!ipPattern.test(host) && !hostnamePattern.test(host) && host !== '0.0.0.0' && host !== 'localhost') {
                 warnings.push(`HOST format may be invalid: ${host}. Use IP address or valid hostname`);
@@ -272,7 +272,7 @@ const config = {
   // Security configuration
   security: {
     enableAuth: process.env.ENABLE_AUTH === 'true' || false,
-    jwtSecret: process.env.JWT_SECRET,
+    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
     passwordSaltRounds: parseInt(process.env.PASSWORD_SALT_ROUNDS) || 12,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
     jwtCookieExpiresIn: parseInt(process.env.JWT_COOKIE_EXPIRES_IN) || 1,
@@ -291,7 +291,7 @@ const config = {
   cors: {
     allowedOrigins: process.env.ALLOWED_ORIGINS ? 
       process.env.ALLOWED_ORIGINS.split(',') : 
-      ['http://localhost:3000', 'http://localhost:9220'],
+      ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:9220'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

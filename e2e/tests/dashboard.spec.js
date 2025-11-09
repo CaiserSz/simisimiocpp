@@ -7,10 +7,12 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { ensureDashboardAuthenticated } from './utils/auth.js';
 
 test.describe('Dashboard', () => {
     test('should load dashboard successfully', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
         // Check page title
         await expect(page).toHaveTitle(/EV Station Simulator/);
@@ -21,6 +23,7 @@ test.describe('Dashboard', () => {
 
     test('should display system overview cards', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
         // Check all overview cards
         await expect(page.locator('text=Total Stations')).toBeVisible();
@@ -31,6 +34,7 @@ test.describe('Dashboard', () => {
 
     test('should show connection status', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
         // Wait for WebSocket connection
         await page.waitForTimeout(2000);
@@ -42,6 +46,7 @@ test.describe('Dashboard', () => {
 
     test('should have metrics chart', async({ page }) => {
         await page.goto('/dashboard');
+        await ensureDashboardAuthenticated(page);
 
         // Check metrics chart exists
         const chart = page.locator('#metrics-chart');

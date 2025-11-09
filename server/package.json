@@ -14,7 +14,7 @@
         "test": "cross-env NODE_ENV=test SIM_FUNCTIONAL_TESTS=true NODE_OPTIONS='--experimental-vm-modules' jest --detectOpenHandles",
         "test:quick": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='tests/compliance|__tests__/controllers' --detectOpenHandles",
         "test:full": "cross-env NODE_ENV=test SIM_FUNCTIONAL_TESTS=true WS_TESTS=true E2E_TESTS=true NODE_OPTIONS='--experimental-vm-modules' jest --detectOpenHandles",
-        "test:unit": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=__tests__/controllers",
+        "test:unit": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='(__tests__/controllers|tests/unit/(public|middleware))'",
         "test:integration": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=tests/integration",
         "test:csms": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=csms-integration --runInBand",
         "test:e2e": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern=e2e-validation --runInBand",

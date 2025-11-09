@@ -108,8 +108,8 @@ export class VehicleSimulator {
       throw new Error(`Invalid vehicle type: ${vehicleProfile}`);
     }
     
-    let initialSoC = options.initialSoC !== undefined ? options.initialSoC : this.randomBetween(10, 60);
-    let targetSoC = options.targetSoC !== undefined ? options.targetSoC : this.randomBetween(80, 100);
+    const initialSoC = options.initialSoC !== undefined ? options.initialSoC : this.randomBetween(10, 60);
+    const targetSoC = options.targetSoC !== undefined ? options.targetSoC : this.randomBetween(80, 100);
     
     // Validate SoC values
     if (initialSoC < 0 || initialSoC > 100) {
