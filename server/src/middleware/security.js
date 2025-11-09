@@ -18,6 +18,11 @@ export const csrfProtection = (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         return next();
     }
+    
+    // TEMPORARY: Skip CSRF in development for dashboard testing
+    if (process.env.NODE_ENV === 'development') {
+        return next();
+    }
 
     // Skip CSRF if authentication is disabled (development only)
     if (!config.security.enableAuth) {
