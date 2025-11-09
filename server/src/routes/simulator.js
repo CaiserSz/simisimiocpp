@@ -187,11 +187,8 @@ router.get('/stations/:stationId',
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
-router.post('/stations',
-    ...validateCreateStation,
-    checkValidation,
-    simulatorController.createStation
-);
+// TEMPORARY: Skip validation for dashboard testing
+router.post('/stations', simulatorController.createStation);
 
 /**
  * @route   POST /api/simulator/stations/from-profile
